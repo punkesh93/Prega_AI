@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import android.content.Intent
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -132,7 +133,15 @@ fun HomeScreen(
                 onWater = onWater,
                 onVitamins = onVitamins,
                 onMood = onMood,
+            )
+        }
+
+        item {
+            ExploreGrid(
                 onOpenKicks = onOpenKicks,
+                onOpenCoach = onOpenCoach,
+                onOpenJourney = onOpenJourney,
+                onOpenAppointments = onOpenAppointments,
             )
         }
 
@@ -145,6 +154,79 @@ fun HomeScreen(
 }
 
 // ─── Sections ──────────────────────────────────────────────────────────────
+
+/**
+ * The reference designs' 2x2 pastel grid — four soft colour blocks, each with
+ * a corner arrow chip. This replaces two full-width nudge cards (kicks,
+ * appointments prompt) so the same destinations now cost half the scroll,
+ * which was the explicit ask. Kick counting keeps its context line inside
+ * the Kicks screen itself, where it's read at the moment it matters.
+ */
+@Composable
+private fun ExploreGrid(
+    onOpenKicks: () -> Unit,
+    onOpenCoach: () -> Unit,
+    onOpenJourney: () -> Unit,
+    onOpenAppointments: () -> Unit,
+) {
+    Column {
+        SectionHeader(title = "Explore", overline = "Everything, one tap")
+        Spacer(Modifier.height(Space.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+            ExploreCell("Count kicks", PregaTheme.colors.sageSoft, onOpenKicks, Modifier.weight(1f))
+            ExploreCell("Ask Prega AI", PregaTheme.colors.lavenderSoft, onOpenCoach, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(Space.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+            ExploreCell("Your journey", PregaTheme.colors.terracottaSoft, onOpenJourney, Modifier.weight(1f))
+            ExploreCell("Appointments", PregaTheme.colors.goldSoft, onOpenAppointments, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ExploreCell(
+    title: String,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PregaCard(
+        onClick = onClick,
+        containerColor = tint,
+        border = false,
+        contentPadding = PaddingValues(Space.md),
+        modifier = modifier.heightIn(min = 96.dp),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = PregaTheme.colors.ink,
+            )
+            Spacer(Modifier.weight(1f))
+            // The reference's corner arrow chip, bottom-right.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(PregaTheme.colors.cardSurface.copy(alpha = 0.75f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = null,
+                        tint = PregaTheme.colors.ink,
+                        modifier = Modifier
+                            .size(15.dp)
+                            .graphicsLayer { rotationZ = -45f },
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HomeHeader(
@@ -584,7 +666,6 @@ private fun QuickLog(
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
-    onOpenKicks: () -> Unit,
 ) {
     Column {
         SectionHeader(title = "Quick log", overline = "One tap each")
@@ -603,28 +684,6 @@ private fun QuickLog(
                 onTap = onVitamins,
                 modifier = Modifier.weight(1f),
             )
-        }
-
-        Spacer(Modifier.height(Space.md))
-
-        PregaCard(onClick = onOpenKicks) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("👣", fontSize = 26.sp)
-                Spacer(Modifier.width(Space.md))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Count kicks",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = PregaTheme.colors.ink,
-                    )
-                    Text(
-                        "Knowing your baby's usual pattern is what makes a change noticeable",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PregaTheme.colors.inkMuted,
-                    )
-                }
-                Text("→", color = PregaTheme.colors.inkFaint, fontSize = 18.sp)
-            }
         }
 
         Spacer(Modifier.height(Space.md))

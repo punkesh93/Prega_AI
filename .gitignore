@@ -15,4 +15,10 @@
 .cxx
 local.properties
 .env
-debug.keystore
+# debug.keystore is deliberately COMMITTED (unusual, and on purpose):
+# Colab regenerated a fresh keystore every build, which changed the app's
+# SHA-1 fingerprint every time — making it impossible to ever register the
+# app for Google sign-in. A debug keystore protects nothing (its passwords
+# are the public Android defaults); a debug SHA-1 that never changes is
+# worth far more than pretend-secrecy here. The RELEASE keystore, when
+# created, must NEVER be committed.

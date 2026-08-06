@@ -404,12 +404,17 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                 },
+                // The reference designs' nav: the active tab sits in a
+                // solid ink pill with the icon knocked out in cream —
+                // unmistakable at a glance, and it inverts correctly in
+                // dark mode (cream pill, dark icon) because ink/cardSurface
+                // swap roles there.
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedIconColor = PregaTheme.colors.cardSurface,
                     unselectedIconColor = PregaTheme.colors.inkFaint,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = PregaTheme.colors.ink,
                     unselectedTextColor = PregaTheme.colors.inkFaint,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    indicatorColor = PregaTheme.colors.ink,
                 ),
             )
         }

@@ -14,7 +14,13 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.pregaai.mxvqzk"
+    // Real, ownable application ID. The AI Studio-generated
+    // "com.aistudio.pregaai.mxvqzk" would work technically, but the ID is
+    // permanent once published — it should be a name you own, not a
+    // generator's random suffix. (namespace stays com.example: it's internal
+    // to the code and changing it means moving every source file for zero
+    // user-visible benefit.)
+    applicationId = "com.pregaai.app"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
