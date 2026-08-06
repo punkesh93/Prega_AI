@@ -9,19 +9,24 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.*
@@ -60,19 +65,29 @@ data class OnboardingResult(
     val billingRegion: String,
 )
 
+/** Mirrors [com.example.auth.GoogleAuthResult] without importing the auth
+ *  package into the UI layer — the screen only needs to know what to show. */
+enum class GoogleSignInStatus { Idle, InProgress, NotConfigured, Failed }
+
 private enum class Step { Welcome, DateEntry, Confirm, AboutYou, Personalise, Notifications }
 
 @Composable
 fun OnboardingScreen(
     weekDescriber: (Int) -> Triple<String, String, String>, // sizeName, emoji, description
     onComplete: (OnboardingResult) -> Unit,
+    // Google sign-in is entirely optional. Everything below defaults to "not
+    // offered" so the screen works standalone (previews, tests) without a
+    // credential manager wired up behind it.
+    googleSignInStatus: GoogleSignInStatus = GoogleSignInStatus.Idle,
+    onGoogleSignIn: () -> Unit = {},
+    prefillName: String = "",
 ) {
     var step by remember { mutableStateOf(Step.Welcome) }
 
     // Collected state
     var dateMode by remember { mutableStateOf(DateMode.DueDate) }
     var dateInput by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
+    var name by remember(prefillName) { mutableStateOf(prefillName) }
     var babyName by remember { mutableStateOf("") }
     var firstPregnancy by remember { mutableStateOf(true) }
     var diet by remember { mutableStateOf(setOf<String>()) }
@@ -115,7 +130,11 @@ fun OnboardingScreen(
                 label = "onboardingStep",
             ) { current ->
                 when (current) {
-                    Step.Welcome -> WelcomePage(onNext = { step = Step.DateEntry })
+                    Step.Welcome -> WelcomePage(
+                        onNext = { step = Step.DateEntry },
+                        googleStatus = googleSignInStatus,
+                        onGoogleSignIn = onGoogleSignIn,
+                    )
 
                     Step.DateEntry -> DatePage(
                         mode = dateMode,
@@ -227,19 +246,27 @@ private fun PageScaffold(
 }
 
 @Composable
-private fun WelcomePage(onNext: () -> Unit) {
+private fun WelcomePage(
+    onNext: () -> Unit,
+    googleStatus: GoogleSignInStatus,
+    onGoogleSignIn: () -> Unit,
+) {
     Box(Modifier.fillMaxSize()) {
         // The signature ambient moment: petals drifting slowly behind the
         // hero. Used here and on the badge reveal only — ambience on every
         // screen stops being ambience.
         PetalDrift(Modifier.fillMaxSize())
 
-        WelcomeContent(onNext)
+        WelcomeContent(onNext, googleStatus, onGoogleSignIn)
     }
 }
 
 @Composable
-private fun WelcomeContent(onNext: () -> Unit) {
+private fun WelcomeContent(
+    onNext: () -> Unit,
+    googleStatus: GoogleSignInStatus,
+    onGoogleSignIn: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -276,6 +303,12 @@ private fun WelcomeContent(onNext: () -> Unit) {
         Spacer(Modifier.weight(1f))
 
         PregaButton("Begin", onNext)
+
+        // Google sign-in is a secondary, skippable option — never the
+        // primary path. Everything in the app works fully signed-out.
+        Spacer(Modifier.height(Space.md))
+        GoogleSignInRow(status = googleStatus, onClick = onGoogleSignIn)
+
         Spacer(Modifier.height(Space.md))
         Text(
             "Prega supports you — it doesn't replace your midwife or doctor.",
@@ -286,6 +319,84 @@ private fun WelcomeContent(onNext: () -> Unit) {
         )
         Spacer(Modifier.height(Space.xl))
     }
+}
+
+/**
+ * The "G" mark is drawn with plain coloured text rather than bundling
+ * Google's logo asset — same recognisable four-colour cue, no brand-asset
+ * file to manage, and it reads fine at this size.
+ */
+@Composable
+private fun GoogleSignInRow(status: GoogleSignInStatus, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        when (status) {
+            GoogleSignInStatus.InProgress -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                    Spacer(Modifier.width(Space.sm))
+                    Text(
+                        "Signing in…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                }
+            }
+
+            else -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(onClick = onClick)
+                        .padding(horizontal = Space.lg, vertical = Space.sm),
+                ) {
+                    GoogleGlyph()
+                    Spacer(Modifier.width(Space.sm))
+                    Text(
+                        "Continue with Google",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                }
+            }
+        }
+
+        if (status == GoogleSignInStatus.Failed) {
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                "That didn't go through — you can keep going without it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkFaint,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (status == GoogleSignInStatus.NotConfigured) {
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                "Google sign-in isn't set up on this build yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkFaint,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoogleGlyph() {
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFF4285F4))) { append("G") }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFEA4335))) { append("o") }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFFBBC05))) { append("o") }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFF4285F4))) { append("g") }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFF34A853))) { append("l") }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFEA4335))) { append("e") }
+    }
+    Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
 }
 
 @Composable
@@ -306,6 +417,15 @@ private fun Promise(emoji: String, title: String, body: String) {
     }
 }
 
+/**
+ * A typed date field is where most onboarding abandonment happens on this kind
+ * of screen — a wrong digit silently produces a wrong week, and a phone
+ * keyboard makes typing "2026-03-11" more fiddly than it looks. This uses
+ * Material's picker instead: no format to get wrong, no keyboard, and each
+ * mode's calendar only lets her tap dates that are actually possible for it
+ * (last period can't be in the future; a due date can't be implausibly far
+ * away), so a mistaken tap is structurally harder to make.
+ */
 @Composable
 private fun DatePage(
     mode: DateMode,
@@ -315,6 +435,9 @@ private fun DatePage(
     computed: ComputedDates?,
     onNext: () -> Unit,
 ) {
+    var showPicker by remember { mutableStateOf(false) }
+    val selectedDate = remember(value) { value.toLocalDateOrNull() }
+
     PageScaffold(
         title = "Let's find your week",
         subtitle = "You don't need to know it — just pick whichever date you have.",
@@ -329,26 +452,32 @@ private fun DatePage(
 
         Spacer(Modifier.height(Space.xl))
 
-        OutlinedTextField(
-            value = value,
-            onValueChange = { onValueChange(it.filter { c -> c.isDigit() || c == '-' }.take(10)) },
-            label = {
-                Text(
-                    when (mode) {
-                        DateMode.DueDate -> "Your due date"
-                        DateMode.LastPeriod -> "First day of your last period"
-                    }
-                )
+        Text(
+            when (mode) {
+                DateMode.DueDate -> "Your due date"
+                DateMode.LastPeriod -> "First day of your last period"
             },
-            placeholder = { Text("YYYY-MM-DD") },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done,
-            ),
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleSmall,
+            color = PregaTheme.colors.inkMuted,
         )
+        Spacer(Modifier.height(Space.sm))
+
+        PregaCard(onClick = { showPicker = true }, contentPadding = PaddingValues(Space.lg)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.width(Space.md))
+                Text(
+                    selectedDate?.format(DISPLAY_FMT) ?: "Tap to choose a date",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (selectedDate != null) PregaTheme.colors.ink else PregaTheme.colors.inkFaint,
+                )
+            }
+        }
 
         AnimatedVisibility(visible = computed != null, enter = Motion.popIn, exit = Motion.popOut) {
             computed?.let {
@@ -370,17 +499,81 @@ private fun DatePage(
                 }
             }
         }
+    }
 
-        if (value.length >= 8 && computed == null) {
-            Spacer(Modifier.height(Space.md))
-            Text(
-                "That date doesn't look right — check the format is YYYY-MM-DD.",
-                style = MaterialTheme.typography.bodySmall,
-                color = PregaTheme.colors.alert,
-            )
-        }
+    if (showPicker) {
+        PregaDatePickerDialog(
+            mode = mode,
+            initial = selectedDate,
+            onDismiss = { showPicker = false },
+            onConfirm = {
+                onValueChange(it.toString())
+                showPicker = false
+            },
+        )
     }
 }
+
+/**
+ * Thin wrapper around Material3's DatePicker. [SelectableDates] does the real
+ * work: it disables — greys out, un-tappable — any day that mode makes
+ * impossible, rather than accepting a bad tap and rejecting it afterwards.
+ */
+@Composable
+private fun PregaDatePickerDialog(
+    mode: DateMode,
+    initial: LocalDate?,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
+) {
+    val today = remember { LocalDate.now() }
+
+    val selectable = remember(mode, today) {
+        object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                val date = java.time.Instant.ofEpochMilli(utcTimeMillis)
+                    .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                return when (mode) {
+                    // Can't have had a last period in the future, and dating
+                    // back further than ~46 weeks isn't a current pregnancy.
+                    DateMode.LastPeriod -> !date.isAfter(today) && !date.isBefore(today.minusDays(320))
+                    // A due date can reasonably sit a little in the past
+                    // (she's likely just given birth, or overdue) through to
+                    // about 46 weeks out.
+                    DateMode.DueDate -> !date.isBefore(today.minusDays(30)) && !date.isAfter(today.plusDays(320))
+                }
+            }
+        }
+    }
+
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = initial?.atStartOfDay(java.time.ZoneOffset.UTC)
+            ?.toInstant()?.toEpochMilli(),
+        selectableDates = selectable,
+    )
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        val date = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        onConfirm(date)
+                    }
+                },
+            ) { Text("Use this date") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    ) {
+        DatePicker(state = state, title = null, showModeToggle = true)
+    }
+}
+
+private fun String.toLocalDateOrNull(): LocalDate? =
+    if (isBlank()) null else runCatching { LocalDate.parse(this) }.getOrNull()
 
 @Composable
 private fun ConfirmPage(

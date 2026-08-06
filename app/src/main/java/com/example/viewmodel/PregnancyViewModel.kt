@@ -178,36 +178,35 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         }
     }
 
+    /**
+     * Attaches a Google account to the profile.
+     *
+     * Uses `copy()` against whatever profile already exists rather than
+     * reconstructing one field-by-field — the previous version rebuilt the
+     * whole entity from a fixed list of fields and silently dropped every
+     * one it forgot to list (onboarding status, notification settings,
+     * dietary preferences...). If this is ever called on a fully set-up
+     * profile — someone linking Google from Settings after already using the
+     * app for weeks — the old version would have quietly reset all of that.
+     *
+     * Called with no existing profile (fresh install, signing in during
+     * onboarding) it creates one via all-default `UserProfileEntity()`,
+     * which is exactly the blank slate onboarding expects to fill in next.
+     */
     fun signInWithGoogle(name: String, email: String, photoUrl: String) {
         viewModelScope.launch {
-            val current = profile.value
-            val currentWeek = current?.currentWeek ?: 12
-            val babyName = current?.babyNamePlaceholder ?: "Little One"
-            val due = current?.dueDate ?: ""
-            val isPremium = current?.isPremium ?: false
-            val freeQuestions = current?.freeQuestionsRemaining ?: 5
-            val lmp = current?.lmpDate ?: ""
-            val test = current?.testDate ?: ""
-            val edd = current?.eddDate ?: ""
-            val billing = current?.billingRegion ?: "GLOBAL"
-
-            val newProfile = UserProfileEntity(
-                id = 1,
-                name = name,
-                currentWeek = currentWeek,
-                babyNamePlaceholder = babyName,
-                dueDate = due,
-                email = email,
-                photoUrl = photoUrl,
-                isGoogleSignedIn = true,
-                isPremium = isPremium,
-                freeQuestionsRemaining = freeQuestions,
-                lmpDate = lmp,
-                testDate = test,
-                eddDate = edd,
-                billingRegion = billing
+            val current = profile.value ?: UserProfileEntity(id = 1, name = "")
+            repository.saveUserProfile(
+                current.copy(
+                    // Only fill the name if she hadn't already set one —
+                    // don't clobber a name she chose herself with whatever
+                    // her Google account happens to be labelled.
+                    name = current.name.ifBlank { name },
+                    email = email,
+                    photoUrl = photoUrl,
+                    isGoogleSignedIn = true,
+                )
             )
-            repository.saveUserProfile(newProfile)
         }
     }
 
@@ -1093,10 +1092,13 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
      */
     fun completeOnboarding(result: com.example.ui.onboarding.OnboardingResult) {
         viewModelScope.launch {
+            // `copy()` against any profile a Google sign-in already created
+            // earlier in this same flow, so her email/photo/isGoogleSignedIn
+            // survive rather than being overwritten by a blank slate.
+            val current = profile.value ?: UserProfileEntity(id = 1, name = "")
             repository.saveUserProfile(
-                UserProfileEntity(
-                    id = 1,
-                    name = result.name,
+                current.copy(
+                    name = result.name.ifBlank { current.name },
                     currentWeek = result.week,
                     babyNamePlaceholder = result.babyName.ifBlank { "Little One" },
                     dueDate = result.eddDate,

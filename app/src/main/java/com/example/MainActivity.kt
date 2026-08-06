@@ -13,9 +13,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
+import com.example.auth.GoogleAuthManager
+import com.example.auth.GoogleAuthResult
 import com.example.billing.BillingManager
 import com.example.data.ALL_MIGRATIONS
 import com.example.data.PregnancyDatabase
@@ -23,6 +28,7 @@ import com.example.data.PregnancyRepository
 import com.example.notifications.NotificationChannels
 import com.example.notifications.NotificationScheduler
 import com.example.ui.PregnancyApp
+import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.theme.PregaTheme
 import com.example.viewmodel.PregnancyViewModel
 import com.example.viewmodel.PregnancyViewModelFactory
@@ -51,6 +57,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val billing by lazy { BillingManager(applicationContext) }
+    private val googleAuth by lazy { GoogleAuthManager(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +91,8 @@ class MainActivity : ComponentActivity() {
                     if (profile?.onboardingComplete == true) viewModel.onAppOpened()
                 }
 
+                var googleSignInStatus by remember { mutableStateOf(GoogleSignInStatus.Idle) }
+
                 val notificationPermission = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
                 ) { granted ->
@@ -110,6 +119,31 @@ class MainActivity : ComponentActivity() {
                             }
                         } else {
                             NotificationScheduler.cancelAll(this@MainActivity)
+                        }
+                    },
+                    googleSignInStatus = googleSignInStatus,
+                    onGoogleSignIn = onGoogleSignIn@{
+                        if (googleSignInStatus == GoogleSignInStatus.InProgress) return@onGoogleSignIn
+                        googleSignInStatus = GoogleSignInStatus.InProgress
+                        lifecycleScope.launch {
+                            when (val result = googleAuth.signIn()) {
+                                is GoogleAuthResult.Success -> {
+                                    viewModel.signInWithGoogle(
+                                        name = result.name,
+                                        email = result.email,
+                                        photoUrl = result.photoUrl,
+                                    )
+                                    googleSignInStatus = GoogleSignInStatus.Idle
+                                }
+                                // Backing out of the picker isn't a failure —
+                                // return to idle without any error copy.
+                                GoogleAuthResult.Cancelled ->
+                                    googleSignInStatus = GoogleSignInStatus.Idle
+                                GoogleAuthResult.NotConfigured ->
+                                    googleSignInStatus = GoogleSignInStatus.NotConfigured
+                                is GoogleAuthResult.Failure ->
+                                    googleSignInStatus = GoogleSignInStatus.Failed
+                            }
                         }
                     },
                 )

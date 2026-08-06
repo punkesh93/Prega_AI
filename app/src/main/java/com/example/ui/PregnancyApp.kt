@@ -36,6 +36,7 @@ import com.example.ui.home.HomeScreen
 import com.example.ui.home.HomeState
 import com.example.ui.journey.JourneyScreen
 import com.example.ui.kicks.KickCounterScreen
+import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.onboarding.OnboardingScreen
 import com.example.ui.paywall.PaywallScreen
 import com.example.ui.rewards.BadgesScreen
@@ -111,6 +112,8 @@ fun PregnancyApp(
     onSubscribe: () -> Unit = {},
     onManageSubscription: () -> Unit = {},
     onNotificationsToggled: (Boolean) -> Unit = {},
+    googleSignInStatus: GoogleSignInStatus = GoogleSignInStatus.Idle,
+    onGoogleSignIn: () -> Unit = {},
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val current = profile
@@ -126,6 +129,11 @@ fun PregnancyApp(
                 viewModel.completeOnboarding(result)
                 onNotificationsToggled(result.notificationsEnabled)
             },
+            googleSignInStatus = googleSignInStatus,
+            onGoogleSignIn = onGoogleSignIn,
+            // If she signed in with Google before reaching the name step,
+            // don't make her type it again.
+            prefillName = current?.name.orEmpty(),
         )
         return
     }
