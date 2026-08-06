@@ -65,14 +65,14 @@ interface OpenRouterApi {
  * Which model handles which job. Cheap-and-fast for short generative copy,
  * stronger models where the answer actually matters to her.
  *
- * Model slugs move fast on OpenRouter — verify these against
- * openrouter.ai/models before a release and update in one place here.
+ * Verified against openrouter.ai/models on 6 Aug 2026. Model slugs move fast —
+ * re-check before a release and update in one place here.
  */
 enum class PregaModel(val slug: String) {
     /** Coach conversations, meal plans — quality matters most. */
-    Conversational("anthropic/claude-3.5-sonnet"),
+    Conversational("anthropic/claude-sonnet-4.5"),
     /** Notification copy, micro-content, quest text — high volume, short. */
-    Quick("anthropic/claude-3.5-haiku"),
+    Quick("anthropic/claude-haiku-4.5"),
 }
 
 // ─── Result type ───────────────────────────────────────────────────────────
