@@ -1084,6 +1084,129 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         }
     }
 
+    // ─── Onboarding & settings ────────────────────────────────────────────
+
+    /**
+     * Writes the profile from the onboarding flow in one transaction and marks
+     * setup complete, so a half-finished profile can never leave the app in a
+     * state where it re-runs onboarding over existing data.
+     */
+    fun completeOnboarding(result: com.example.ui.onboarding.OnboardingResult) {
+        viewModelScope.launch {
+            repository.saveUserProfile(
+                UserProfileEntity(
+                    id = 1,
+                    name = result.name,
+                    currentWeek = result.week,
+                    babyNamePlaceholder = result.babyName.ifBlank { "Little One" },
+                    dueDate = result.eddDate,
+                    eddDate = result.eddDate,
+                    lmpDate = result.lmpDate,
+                    dietaryPreferences = result.dietaryPreferences,
+                    isFirstPregnancy = result.isFirstPregnancy,
+                    notificationsEnabled = result.notificationsEnabled,
+                    billingRegion = result.billingRegion,
+                    onboardingComplete = true,
+                )
+            )
+            onAppOpened()
+        }
+    }
+
+    fun updateProfileDetails(name: String, babyName: String, diet: String) {
+        viewModelScope.launch {
+            val current = profile.value ?: return@launch
+            repository.saveUserProfile(
+                current.copy(
+                    name = name.trim(),
+                    babyNamePlaceholder = babyName.trim().ifBlank { "Little One" },
+                    dietaryPreferences = diet.trim(),
+                )
+            )
+        }
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            profile.value?.let {
+                repository.saveUserProfile(it.copy(notificationsEnabled = enabled))
+            }
+        }
+    }
+
+    fun setWaterGoal(glasses: Int) {
+        viewModelScope.launch {
+            profile.value?.let {
+                repository.saveUserProfile(it.copy(waterGoalGlasses = glasses.coerceIn(1, 20)))
+            }
+        }
+    }
+
+    /**
+     * Entitlement cache. Only ever called from the billing client — UI code
+     * must never grant premium directly.
+     */
+    fun syncPremiumEntitlement(isPremium: Boolean) {
+        viewModelScope.launch {
+            val current = profile.value ?: return@launch
+            if (current.isPremium == isPremium) return@launch
+            repository.saveUserProfile(current.copy(isPremium = isPremium))
+        }
+    }
+
+    // ─── Export ───────────────────────────────────────────────────────────
+
+    private val _exportedData = MutableStateFlow<String?>(null)
+    val exportedData: StateFlow<String?> = _exportedData.asStateFlow()
+
+    /**
+     * Plain-text export of everything held locally. Deliberately human-readable
+     * rather than JSON: the realistic use is printing it or showing it to a
+     * midwife, not importing it elsewhere.
+     */
+    fun exportData() {
+        viewModelScope.launch {
+            val p = profile.value
+            val logs = repository.getAllDailyLogs().first()
+            val kicks = repository.getAllKickLogs().first()
+            val moods = repository.getRecentMoods(365).first()
+            val appts = repository.getAppointments().first()
+
+            _exportedData.value = buildString {
+                appendLine("PREGA AI — YOUR DATA")
+                appendLine("Exported ${_todayDate.value}")
+                appendLine()
+                appendLine("PROFILE")
+                appendLine("  Name: ${p?.name.orEmpty()}")
+                appendLine("  Week: ${p?.currentWeek ?: 0}")
+                appendLine("  Due date: ${p?.eddDate.orEmpty()}")
+                appendLine()
+                appendLine("DAILY LOGS (${logs.size})")
+                logs.forEach {
+                    appendLine(
+                        "  ${it.date} · water ${it.waterGlasses} · " +
+                            "vitamins ${if (it.tookVitamins) "yes" else "no"} · " +
+                            "sleep ${it.sleptHours}h" +
+                            if (it.symptoms.isNotBlank()) " · ${it.symptoms}" else ""
+                    )
+                }
+                appendLine()
+                appendLine("KICK SESSIONS (${kicks.size})")
+                kicks.forEach {
+                    appendLine("  ${it.date} · ${it.count} movements in ${it.durationSeconds / 60}m")
+                }
+                appendLine()
+                appendLine("MOOD (${moods.size})")
+                moods.forEach { appendLine("  ${it.date} · ${it.mood}/5 ${it.tags}") }
+                appendLine()
+                appendLine("APPOINTMENTS (${appts.size})")
+                appts.forEach { appendLine("  ${it.date} ${it.time} · ${it.title}") }
+            }
+        }
+    }
+
+    fun clearExport() { _exportedData.value = null }
+
     companion object {
         const val GREETING =
             "I'm here whenever you need me — questions about how you're feeling, " +
