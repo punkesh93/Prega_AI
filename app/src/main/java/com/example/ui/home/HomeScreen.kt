@@ -339,38 +339,76 @@ private fun greetingFor(name: String): String {
 }
 
 @Composable
+/**
+ * Redesigned to the reference language after a real-device screenshot showed
+ * the problem plainly: the old hero was a full-bleed trimester-gold gradient
+ * slab sitting directly above the gold affirmation card — the whole top of
+ * the page read as one monotone amber block, and the week description
+ * paragraph made it enormous.
+ *
+ * Now: a soft flat blush card with ink serif text (the references never put
+ * white text on saturated slabs), the baby-size emoji in a cream circle
+ * chip, and no paragraph — the full week description lives on Journey where
+ * she goes to read, not scan. Trimester colour survives as a small tinted
+ * chip instead of painting the whole card. Gold now appears exactly once on
+ * this screen: the affirmation.
+ */
+@Composable
 private fun WeekHero(
     weekInfo: WeekInfo,
     babyName: String,
     daysRemaining: Int,
     onClick: () -> Unit,
 ) {
-    val tint = trimesterColor(weekInfo.trimester)
+    val trimesterTint = trimesterColor(weekInfo.trimester)
 
-    GradientCard(
-        brush = androidx.compose.ui.graphics.Brush.linearGradient(
-            listOf(tint.copy(alpha = 0.9f), tint.copy(alpha = 0.65f))
-        ),
+    PregaCard(
+        onClick = onClick,
+        containerColor = PregaTheme.colors.terracottaSoft,
+        border = false,
+        contentPadding = PaddingValues(Space.lg),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Overline("Trimester ${weekInfo.trimester}", color = Color.White.copy(alpha = 0.85f))
+                // Trimester as a small tinted chip, not a card-wide colour.
+                Box(
+                    Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .background(trimesterTint.copy(alpha = 0.22f))
+                        .padding(horizontal = Space.sm, vertical = Space.xxs),
+                ) {
+                    Text(
+                        "Trimester ${weekInfo.trimester}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                }
                 Spacer(Modifier.height(Space.sm))
                 Text(
                     "Week ${weekInfo.week}",
                     style = MaterialTheme.typography.displayMedium,
-                    color = Color.White,
+                    color = PregaTheme.colors.ink,
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
                     if (babyName.isBlank()) "About the size of a ${weekInfo.sizeName.lowercase()}"
                     else "$babyName is about the size of a ${weekInfo.sizeName.lowercase()}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.92f),
+                    color = PregaTheme.colors.inkMuted,
                 )
             }
-            Breathing { Text(weekInfo.iconEmoji, fontSize = 64.sp) }
+
+            // Emoji sits in a cream circle chip, the references' framing move.
+            Box(
+                Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(PregaTheme.colors.cardSurface.copy(alpha = 0.8f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Breathing { Text(weekInfo.iconEmoji, fontSize = 38.sp) }
+            }
         }
 
         Spacer(Modifier.height(Space.lg))
@@ -380,7 +418,7 @@ private fun WeekHero(
         PregaProgressBar(
             progress = weekInfo.week / 40f,
             brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                listOf(Color.White, Color.White.copy(alpha = 0.75f))
+                listOf(PregaTheme.colors.terracotta, trimesterTint)
             ),
             height = 6.dp,
         )
@@ -392,30 +430,23 @@ private fun WeekHero(
             Text(
                 "${weekInfo.lengthCm} cm · ${formatWeight(weekInfo.weightGrams)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f),
+                color = PregaTheme.colors.inkMuted,
             )
             Text(
                 if (daysRemaining > 0) "$daysRemaining days to go" else "Any day now",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f),
+                color = PregaTheme.colors.inkMuted,
             )
         }
-
-        Spacer(Modifier.height(Space.lg))
-        Text(
-            weekInfo.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.95f),
-        )
 
         Spacer(Modifier.height(Space.md))
-        TextButton(onClick = onClick, contentPadding = PaddingValues(0.dp)) {
-            Text(
-                "See the full journey →",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
-            )
-        }
+        // The whole card is tappable; this line is the affordance hint, in
+        // ink — the old white would be invisible on the new light card.
+        Text(
+            "See the full journey →",
+            style = MaterialTheme.typography.labelMedium,
+            color = PregaTheme.colors.terracotta,
+        )
     }
 }
 
