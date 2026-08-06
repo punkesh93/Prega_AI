@@ -140,7 +140,7 @@ fun WaterTile(
                 when {
                     goalMet -> "Goal reached"
                     glasses == 0 -> "Tap to log a glass"
-                    else -> "Tap for another",
+                    else -> "Tap for another"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (goalMet) PregaTheme.colors.sage else PregaTheme.colors.inkFaint,

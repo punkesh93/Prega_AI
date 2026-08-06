@@ -84,7 +84,7 @@ fun PregaCard(
 
     Column(
         modifier = if (onClick != null) {
-            base.clickableNoRipple(interaction, onClick)
+            base.clickableNoRipple(interaction, onClick = onClick)
         } else base,
     ) {
         Column(Modifier.padding(contentPadding), content = content)
