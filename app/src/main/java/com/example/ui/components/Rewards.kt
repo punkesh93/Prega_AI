@@ -116,53 +116,70 @@ fun BadgeReveal(
         label = "badgeScale",
     )
 
+    // A soft rose-tinted veil and a cream card — a gift being handed to her,
+    // not a dark screen takeover. The earlier version dimmed everything to
+    // near-black and put white text on the scrim, which clashed with the warm
+    // palette everywhere else in the app; celebration should feel MORE like
+    // the app, not less.
     Box(
         Modifier
             .fillMaxSize()
-            .background(PregaTheme.colors.ink.copy(alpha = 0.55f))
+            .background(PregaTheme.colors.ink.copy(alpha = 0.30f))
             .clickable(interactionSource = interaction, indication = null, onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
-        PetalDrift(Modifier.fillMaxSize(), petalCount = 8, tint = Color.White)
         Confetti(tier = badge.tier)
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(Space.xxl)
-                .graphicsLayer { scaleX = scale; scaleY = scale },
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(PregaTheme.colors.cardSurface)
+                .padding(horizontal = Space.xxl, vertical = Space.xl),
         ) {
+            // Tier colour appears as a soft halo behind the emblem, never as
+            // a full-bleed slab, so every tier sits comfortably on cream.
             Box(
                 Modifier
-                    .size(132.dp)
+                    .size(120.dp)
                     .clip(CircleShape)
-                    .background(tierBrushColor(badge.tier)),
+                    .background(tierBrushColor(badge.tier).copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Breathing(minScale = 0.96f, maxScale = 1.04f) {
-                    Text(badge.emoji, fontSize = 62.sp)
+                Box(
+                    Modifier
+                        .size(88.dp)
+                        .clip(CircleShape)
+                        .background(tierBrushColor(badge.tier).copy(alpha = 0.30f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Breathing(minScale = 0.96f, maxScale = 1.04f) {
+                        Text(badge.emoji, fontSize = 44.sp)
+                    }
                 }
             }
 
-            Spacer(Modifier.height(Space.xl))
+            Spacer(Modifier.height(Space.lg))
             Text(
                 badge.name,
                 style = MaterialTheme.typography.displaySmall,
-                color = Color.White,
+                color = PregaTheme.colors.ink,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Space.sm))
             Text(
                 celebration ?: badge.description,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = PregaTheme.colors.inkMuted,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(Space.xl))
+            Spacer(Modifier.height(Space.lg))
             Text(
                 "Tap anywhere to continue",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.5f),
+                color = PregaTheme.colors.inkFaint,
             )
         }
     }

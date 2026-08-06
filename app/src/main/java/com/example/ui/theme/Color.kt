@@ -37,14 +37,18 @@ val GoldSoft           = Color(0xFFF7E6C4)
 val Lavender           = Color(0xFF9B8FB5)
 val LavenderSoft       = Color(0xFFE6E1EF)
 
-// ─── Neutrals (warm-tinted, never pure grey) ───────────────────────────────
-val Linen              = Color(0xFFFDFAF7)  // app background
-val Shell              = Color(0xFFF7F1EC)  // recessed surface
-val Card               = Color(0xFFFFFFFF)  // raised surface
-val Ink                = Color(0xFF33272A)  // primary text — warm near-black
-val InkMuted           = Color(0xFF7A6A6E)  // secondary text
-val InkFaint           = Color(0xFFA89A9D)  // tertiary text / placeholders
-val Hairline           = Color(0xFFEDE4DE)  // borders, dividers
+// ─── Neutrals ──────────────────────────────────────────────────────────────
+// Warm cream, not near-white: the base is closer to unbleached paper. This is
+// what makes the reference designs read as "calm" — colour sits ON warmth
+// rather than on clinical white. Ink shifts to a deep warm olive-brown to
+// match, so text feels inked rather than printed.
+val Linen              = Color(0xFFF7F2E9)  // app background — warm cream
+val Shell              = Color(0xFFEFE8DB)  // recessed surface
+val Card               = Color(0xFFFFFDF8)  // raised surface — cream-white
+val Ink                = Color(0xFF3A342A)  // primary text — warm olive-black
+val InkMuted           = Color(0xFF7C7263)  // secondary text
+val InkFaint           = Color(0xFFA79D8C)  // tertiary text / placeholders
+val Hairline           = Color(0xFFE7DFCF)  // borders, dividers
 
 // ─── Dark theme neutrals ───────────────────────────────────────────────────
 val InkDarkBg          = Color(0xFF1A1416)
@@ -77,7 +81,7 @@ fun trimesterColor(trimester: Int): Color = when (trimester) {
 }
 
 // ─── Gradients (as colour stop lists — consumed by Brush helpers) ──────────
-val GradientDawn      = listOf(Color(0xFFFDF0EC), Color(0xFFF9E4E6))  // hero bg
+val GradientDawn      = listOf(Color(0xFFF9F4EA), Color(0xFFF6E7E2))  // hero bg
 val GradientBloom     = listOf(Color(0xFFE89AA2), Color(0xFFD97A84))  // primary CTA
 val GradientGold      = listOf(Color(0xFFE8BC63), Color(0xFFD9A441))  // rewards
 val GradientSage      = listOf(Color(0xFF9DBCA1), Color(0xFF7A9E7E))  // wellness

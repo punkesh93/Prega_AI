@@ -20,7 +20,14 @@ import androidx.compose.ui.unit.sp
  * drop a serif (e.g. Fraunces / Playfair) into res/font and point
  * [DisplayFamily] at it — every display style updates automatically.
  */
-val DisplayFamily: FontFamily = FontFamily.Default
+/**
+ * Serif for display — this is most of what makes the reference designs feel
+ * editorial and warm instead of app-like. The platform serif (Noto Serif on
+ * most devices) ships with Android, so this costs zero APK size; swap in a
+ * bundled Fraunces/Playfair later for full brand control without touching
+ * any call site.
+ */
+val DisplayFamily: FontFamily = FontFamily.Serif
 val BodyFamily: FontFamily = FontFamily.Default
 
 /** Trims excess leading so large text optically centres in its box. */

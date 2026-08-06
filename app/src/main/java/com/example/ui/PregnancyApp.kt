@@ -226,6 +226,16 @@ private fun MainScaffold(
             ) { selected ->
                 when (selected) {
                     Tab.Today -> HomeScreen(
+                        themeMode = themeMode,
+                        // Home toggle flips Light <-> Dark directly; "System"
+                        // remains available in Settings for those who want it.
+                        onToggleTheme = {
+                            onThemeModeChange(
+                                if (themeMode == com.example.ui.theme.ThemeMode.Dark)
+                                    com.example.ui.theme.ThemeMode.Light
+                                else com.example.ui.theme.ThemeMode.Dark
+                            )
+                        },
                         state = HomeState(
                             profile = profile,
                             weekInfo = weekInfo,

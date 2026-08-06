@@ -5,13 +5,19 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Medication
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +33,7 @@ import com.example.ui.components.*
 import com.example.ui.theme.Motion
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
+import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.trimesterColor
 import com.example.viewmodel.WeekInfo
 
@@ -64,6 +71,8 @@ data class HomeState(
 @Composable
 fun HomeScreen(
     state: HomeState,
+    themeMode: ThemeMode = ThemeMode.System,
+    onToggleTheme: () -> Unit = {},
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
@@ -84,9 +93,16 @@ fun HomeScreen(
             top = Space.sm,
             bottom = Space.navClearance,
         ),
-        verticalArrangement = Arrangement.spacedBy(Space.lg),
+        verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
-        item { Greeting(state.profile?.name.orEmpty()) }
+        item {
+            HomeHeader(
+                name = state.profile?.name.orEmpty(),
+                state = state,
+                themeMode = themeMode,
+                onToggleTheme = onToggleTheme,
+            )
+        }
 
         item {
             WeekHero(
@@ -130,13 +146,96 @@ fun HomeScreen(
 // ─── Sections ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun Greeting(name: String) {
-    Column(Modifier.padding(top = Space.md)) {
+private fun HomeHeader(
+    name: String,
+    state: HomeState,
+    themeMode: ThemeMode,
+    onToggleTheme: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             greetingFor(name),
             style = MaterialTheme.typography.headlineLarge,
             color = PregaTheme.colors.ink,
+            modifier = Modifier.weight(1f),
         )
+
+        // Day/night, one tap from the home screen. The icon shows what
+        // tapping GIVES her (moon = "switch to dark"), not the current state.
+        HeaderIcon(
+            icon = if (themeMode == ThemeMode.Dark) Icons.Outlined.LightMode
+            else Icons.Outlined.DarkMode,
+            contentDescription = "Switch theme",
+            onClick = onToggleTheme,
+        )
+        Spacer(Modifier.width(Space.sm))
+        HeaderIcon(
+            icon = Icons.Outlined.Share,
+            contentDescription = "Share my journey",
+            onClick = { shareJourney(context, state) },
+        )
+    }
+}
+
+@Composable
+private fun HeaderIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(PregaTheme.colors.cardSurface)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = PregaTheme.colors.inkMuted,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/**
+ * "Share my journey" — a warm, ready-to-send update for WhatsApp or anywhere.
+ * ACTION_SEND with a chooser rather than deep-linking WhatsApp specifically:
+ * the chooser shows WhatsApp first for most Indian users anyway, and this way
+ * dads on Telegram or grandmothers on SMS aren't excluded.
+ *
+ * Privacy line held on purpose: the message shares the joyful facts (week,
+ * size, countdown) and NEVER auto-includes mood, symptoms, weight, or kick
+ * counts — those are hers to tell, not the app's to broadcast.
+ */
+private fun shareJourney(context: android.content.Context, state: HomeState) {
+    val week = state.weekInfo.week
+    val baby = state.profile?.babyNamePlaceholder?.ifBlank { "our little one" } ?: "our little one"
+    val size = state.weekInfo.sizeName.lowercase()
+    val days = state.daysRemaining
+
+    val text = buildString {
+        append("Week $week of our journey 🌸\n")
+        append("$baby is about the size of a $size ${state.weekInfo.iconEmoji}\n")
+        if (days > 0) append("$days days to go!\n")
+        append("\nShared from Prega AI")
+    }
+
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share your journey"))
     }
 }
 
@@ -579,7 +678,7 @@ private fun VitaminsTile(
     )
 
     PregaCard(
-        modifier = modifier.heightIn(min = 128.dp),
+        modifier = modifier.heightIn(min = 112.dp),
         onClick = onTap,
         containerColor = if (taken) PregaTheme.colors.successSoft
         else PregaTheme.colors.goldSoft,

@@ -91,7 +91,7 @@ fun WaterTile(
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onTap()
             }
-            .heightIn(min = 128.dp),
+            .heightIn(min = 112.dp),
     ) {
         // ── The water ──
         Canvas(Modifier.fillMaxSize()) {
