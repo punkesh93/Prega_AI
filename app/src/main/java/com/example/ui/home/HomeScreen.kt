@@ -338,7 +338,6 @@ private fun greetingFor(name: String): String {
     }
 }
 
-@Composable
 /**
  * Redesigned to the reference language after a real-device screenshot showed
  * the problem plainly: the old hero was a full-bleed trimester-gold gradient
