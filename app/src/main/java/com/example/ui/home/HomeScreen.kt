@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -342,7 +343,13 @@ private fun formatWeight(grams: Double): String =
 
 @Composable
 private fun InsightCard(insight: String?, onOpenCoach: () -> Unit) {
-    PregaCard(onClick = onOpenCoach) {
+    // Sage block, per the reference designs — the calm-green "content" tint,
+    // distinct from the pastel quest stack below it.
+    PregaCard(
+        onClick = onOpenCoach,
+        containerColor = PregaTheme.colors.sageSoft,
+        border = false,
+    ) {
         Row(verticalAlignment = Alignment.Top) {
             Box(
                 Modifier
@@ -447,8 +454,8 @@ private fun QuestSection(quests: List<QuestEntity>, onComplete: (QuestEntity) ->
         Spacer(Modifier.height(Space.md))
 
         Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-            quests.forEach { quest ->
-                QuestRow(quest, onComplete)
+            quests.forEachIndexed { index, quest ->
+                QuestRow(quest, index, onComplete)
             }
         }
 
@@ -467,12 +474,27 @@ private fun QuestSection(quests: List<QuestEntity>, onComplete: (QuestEntity) ->
     }
 }
 
+/**
+ * The reference designs' signature move: adjacent cards in different soft
+ * pastels — blush, butter, sage — rather than a column of identical white
+ * cards. Each quest takes its tint from its position; completing one fades it
+ * to the recessed neutral, so colour literally drains from what's done and
+ * the remaining colour shows her what's left at a glance.
+ */
 @Composable
-private fun QuestRow(quest: QuestEntity, onComplete: (QuestEntity) -> Unit) {
+private fun QuestRow(quest: QuestEntity, index: Int, onComplete: (QuestEntity) -> Unit) {
+    val tints = listOf(
+        PregaTheme.colors.terracottaSoft,
+        PregaTheme.colors.goldSoft,
+        PregaTheme.colors.sageSoft,
+        PregaTheme.colors.lavenderSoft,
+    )
+
     PregaCard(
         onClick = { if (!quest.completed) onComplete(quest) },
         containerColor = if (quest.completed) PregaTheme.colors.recessed
-        else PregaTheme.colors.cardSurface,
+        else tints[index % tints.size],
+        border = false,
         contentPadding = PaddingValues(Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -490,7 +512,8 @@ private fun QuestRow(quest: QuestEntity, onComplete: (QuestEntity) -> Unit) {
                     Text(
                         quest.rationale,
                         style = MaterialTheme.typography.bodySmall,
-                        color = PregaTheme.colors.inkFaint,
+                        color = if (quest.completed) PregaTheme.colors.inkFaint
+                        else PregaTheme.colors.inkMuted,
                     )
                 }
             }
@@ -621,6 +644,7 @@ private fun QuickLog(
                     MoodOption(
                         emoji = emoji,
                         label = label,
+                        index = i,
                         selected = mood?.mood == i + 1,
                         onClick = { onMood(i + 1) },
                     )
@@ -639,21 +663,58 @@ private val MOODS = listOf(
     "😄" to "Great",
 )
 
+/**
+ * The reference designs' mood row: each feeling is a face in its own softly
+ * tinted circle, and the chosen one wears a ring — selection you can see
+ * from across the room, no filled backgrounds or checkmarks needed. Tints
+ * run warm at the hard end to cool-calm at the good end, but no mood is
+ * styled as a wrong answer.
+ */
 @Composable
-private fun MoodOption(emoji: String, label: String, selected: Boolean, onClick: () -> Unit) {
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.15f else 1f,
-        animationSpec = Motion.playful(),
-        label = "moodScale",
+private fun MoodOption(
+    emoji: String,
+    label: String,
+    index: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val circleTints = listOf(
+        PregaTheme.colors.terracottaSoft,  // rough
+        PregaTheme.colors.goldSoft,        // low
+        PregaTheme.colors.lavenderSoft,    // okay
+        PregaTheme.colors.sageSoft,        // good
+        PregaTheme.colors.successSoft,     // great
     )
+    val ring by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = Motion.playful(),
+        label = "moodRing",
+    )
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) PregaTheme.colors.recessed else Color.Transparent)
-            .padding(horizontal = Space.md, vertical = Space.sm),
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.xs, vertical = Space.sm),
     ) {
-        Text(emoji, fontSize = (22 * scale).sp)
+        Box(
+            Modifier
+                .size(46.dp)
+                .then(
+                    if (ring > 0f) Modifier.border(
+                        width = (2 * ring).dp,
+                        color = PregaTheme.colors.sage,
+                        shape = CircleShape,
+                    ) else Modifier
+                )
+                .padding((3 * ring).dp)
+                .clip(CircleShape)
+                .background(circleTints[index % circleTints.size]),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(emoji, fontSize = 20.sp)
+        }
         Spacer(Modifier.height(Space.xs))
         Text(
             label,
