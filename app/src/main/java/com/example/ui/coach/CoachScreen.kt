@@ -317,7 +317,7 @@ private fun Composer(
         Modifier
             .fillMaxWidth()
             .background(PregaTheme.colors.cardSurface)
-            .navigationBarPadding()
+            .navigationBarsPadding()
             .padding(Space.md),
         verticalAlignment = Alignment.Bottom,
     ) {
