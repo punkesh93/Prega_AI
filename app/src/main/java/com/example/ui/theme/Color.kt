@@ -51,12 +51,15 @@ val InkFaint           = Color(0xFFA79D8C)  // tertiary text / placeholders
 val Hairline           = Color(0xFFE7DFCF)  // borders, dividers
 
 // ─── Dark theme neutrals ───────────────────────────────────────────────────
-val InkDarkBg          = Color(0xFF1A1416)
-val InkDarkSurface     = Color(0xFF241C1F)
-val InkDarkCard        = Color(0xFF2E2427)
-val InkDarkHairline    = Color(0xFF3D3134)
-val OnDark             = Color(0xFFF5EDEA)
-val OnDarkMuted        = Color(0xFFB5A5A8)
+// Same warmth philosophy as light: not near-black but a deep warm umber, like
+// a candlelit room rather than an OLED void. On-dark text is warm cream so
+// dark mode feels like the same calm app after sunset, not a different app.
+val InkDarkBg          = Color(0xFF211B14)
+val InkDarkSurface     = Color(0xFF2A231B)
+val InkDarkCard        = Color(0xFF342C22)
+val InkDarkHairline    = Color(0xFF443A2E)
+val OnDark             = Color(0xFFF3ECDF)
+val OnDarkMuted        = Color(0xFFBCB09D)
 
 // ─── Semantic / status ─────────────────────────────────────────────────────
 val Success            = Color(0xFF5B9E6A)
