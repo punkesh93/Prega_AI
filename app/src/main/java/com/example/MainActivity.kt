@@ -30,6 +30,8 @@ import com.example.notifications.NotificationScheduler
 import com.example.ui.PregnancyApp
 import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.theme.PregaTheme
+import com.example.ui.theme.ThemeMode
+import com.example.ui.theme.ThemePreference
 import com.example.viewmodel.PregnancyViewModel
 import com.example.viewmodel.PregnancyViewModelFactory
 import kotlinx.coroutines.launch
@@ -76,7 +78,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            PregaTheme {
+            var themeMode by remember { mutableStateOf(ThemePreference.get(this)) }
+
+            PregaTheme(
+                darkTheme = when (themeMode) {
+                    ThemeMode.System -> androidx.compose.foundation.isSystemInDarkTheme()
+                    ThemeMode.Light -> false
+                    ThemeMode.Dark -> true
+                }
+            ) {
                 val billingState by billing.connectionState.collectAsStateWithLifecycle()
                 val offer by billing.offer.collectAsStateWithLifecycle()
                 val billingError by billing.lastError.collectAsStateWithLifecycle()
@@ -120,6 +130,11 @@ class MainActivity : ComponentActivity() {
                         } else {
                             NotificationScheduler.cancelAll(this@MainActivity)
                         }
+                    },
+                    themeMode = themeMode,
+                    onThemeModeChange = { mode ->
+                        themeMode = mode
+                        ThemePreference.set(this@MainActivity, mode)
                     },
                     googleSignInStatus = googleSignInStatus,
                     onGoogleSignIn = onGoogleSignIn@{

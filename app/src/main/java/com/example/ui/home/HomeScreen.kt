@@ -55,6 +55,7 @@ data class HomeState(
     val progress: ProgressEntity,
     val quests: List<QuestEntity>,
     val insight: String?,
+    val affirmation: String?,
     val mood: MoodEntity?,
     val nextAppointment: AppointmentEntity?,
     val daysRemaining: Int,
@@ -97,6 +98,10 @@ fun HomeScreen(
         }
 
         item { InsightCard(state.insight, onOpenCoach) }
+
+        state.affirmation?.let {
+            item { AffirmationCard(it) }
+        }
 
         if (state.quests.isNotEmpty()) {
             item { QuestSection(state.quests, onQuestComplete) }
@@ -272,6 +277,29 @@ private fun InsightCard(insight: String?, onOpenCoach: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/**
+ * The day's affirmation. Sits right after the insight, styled as the one gold
+ * moment on the home screen — gold is reserved for reward surfaces, and this
+ * is a small daily gift rather than information. Deliberately not a card she
+ * can tap: there is nothing to do here except read it, which is the point.
+ */
+@Composable
+private fun AffirmationCard(text: String) {
+    GradientCard(
+        brush = PregaTheme.colors.goldBrush,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(Space.lg),
+    ) {
+        Overline("Today's affirmation", color = Color.White.copy(alpha = 0.85f))
+        Spacer(Modifier.height(Space.sm))
+        Text(
+            "\u201C$text\u201D",
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color.White,
+        )
     }
 }
 

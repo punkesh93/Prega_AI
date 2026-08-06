@@ -529,6 +529,47 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     private val _dailyInsight = MutableStateFlow<String?>(null)
     val dailyInsight: StateFlow<String?> = _dailyInsight.asStateFlow()
 
+    // --- Daily affirmation ---
+    private val _dailyAffirmation = MutableStateFlow<String?>(null)
+    val dailyAffirmation: StateFlow<String?> = _dailyAffirmation.asStateFlow()
+
+    /**
+     * Offline pool so the card never sits empty. Same rule as the AI prompt:
+     * affirms what is true about her — never an outcome promise.
+     */
+    private val FALLBACK_AFFIRMATIONS = listOf(
+        "My body knows how to do this, one day at a time.",
+        "I am allowed to rest as much as I need.",
+        "Growing a person is work. I am doing it right now.",
+        "I don't have to feel grateful every minute to be a good mother.",
+        "Today, showing up is enough.",
+        "I can ask for help. That is strength, not weakness.",
+        "Every week that passes, I have carried us both.",
+        "I trust myself to notice what matters.",
+    )
+
+    fun refreshDailyAffirmation() {
+        viewModelScope.launch {
+            val p = profile.value ?: return@launch
+            val week = p.currentWeek
+            _dailyAffirmation.value = OpenRouterClient.completeOrNull(
+                systemPrompt = PregaPrompts.dailyAffirmation(
+                    week = week,
+                    trimester = trimesterFor(week),
+                    babyName = p.babyNamePlaceholder,
+                    name = p.name,
+                ),
+                userPrompt = "Today is ${_todayDate.value}. Give me today's affirmation.",
+                model = PregaModel.Quick,
+                temperature = 1.0,
+                maxTokens = 60,
+            ) ?: FALLBACK_AFFIRMATIONS[
+                // Stable per-day pick, so it doesn't change on every recomposition.
+                (_todayDate.value.hashCode().let { if (it < 0) -it else it }) % FALLBACK_AFFIRMATIONS.size
+            ]
+        }
+    }
+
     /**
      * Regenerated once per day. The prompt explicitly rotates its angle so two
      * consecutive days never read the same.
@@ -961,6 +1002,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             award(GamificationEngine.Action.DailyOpen, week, "Welcome back")
             ensureQuestsForToday()
             refreshDailyInsight()
+            refreshDailyAffirmation()
             repository.pruneQuestsBefore(_todayDate.value)
         }
     }
@@ -1213,9 +1255,9 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
 
     companion object {
         const val GREETING =
-            "I'm here whenever you need me — questions about how you're feeling, " +
-            "what's normal this week, food, sleep, any of it. I'm not a doctor, " +
-            "so anything that worries you goes to your midwife or OB-GYN first."
+            "Hi, I'm Prega AI. Ask me anything — how you feel, food, sleep, " +
+            "what's normal this week.\n\nI'm not a doctor. If something " +
+            "worries you, call your midwife or doctor first."
     }
 }
 

@@ -92,7 +92,7 @@ private enum class Tab(
         Icons.Filled.Favorite,
     ),
     Coach(
-        "Coach",
+        "Prega AI",
         Icons.AutoMirrored.Outlined.Chat,
         Icons.AutoMirrored.Filled.Chat,
     ),
@@ -115,6 +115,8 @@ fun PregnancyApp(
     onNotificationsToggled: (Boolean) -> Unit = {},
     googleSignInStatus: GoogleSignInStatus = GoogleSignInStatus.Idle,
     onGoogleSignIn: () -> Unit = {},
+    themeMode: com.example.ui.theme.ThemeMode = com.example.ui.theme.ThemeMode.System,
+    onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit = {},
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val current = profile
@@ -148,6 +150,8 @@ fun PregnancyApp(
         onSubscribe = onSubscribe,
         onManageSubscription = onManageSubscription,
         onNotificationsToggled = onNotificationsToggled,
+        themeMode = themeMode,
+        onThemeModeChange = onThemeModeChange,
     )
 }
 
@@ -161,6 +165,8 @@ private fun MainScaffold(
     onSubscribe: () -> Unit,
     onManageSubscription: () -> Unit,
     onNotificationsToggled: (Boolean) -> Unit,
+    themeMode: com.example.ui.theme.ThemeMode,
+    onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     var showPaywall by rememberSaveable { mutableStateOf(false) }
@@ -171,6 +177,7 @@ private fun MainScaffold(
     val badges by viewModel.badges.collectAsStateWithLifecycle()
     val mood by viewModel.moodToday.collectAsStateWithLifecycle()
     val insight by viewModel.dailyInsight.collectAsStateWithLifecycle()
+    val affirmation by viewModel.dailyAffirmation.collectAsStateWithLifecycle()
     val nextAppointment by viewModel.nextAppointment.collectAsStateWithLifecycle()
     val kickLogs by viewModel.kickLogs.collectAsStateWithLifecycle()
     val isCounting by viewModel.isCountingKicks.collectAsStateWithLifecycle()
@@ -226,6 +233,7 @@ private fun MainScaffold(
                             progress = progress,
                             quests = quests,
                             insight = insight,
+                            affirmation = affirmation,
                             mood = mood,
                             nextAppointment = nextAppointment,
                             daysRemaining = daysUntil(profile.eddDate),
@@ -275,6 +283,8 @@ private fun MainScaffold(
                         onUpgrade = { showPaywall = true },
                         onManageSubscription = onManageSubscription,
                         onNotificationsToggled = onNotificationsToggled,
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
                     )
                 }
             }
@@ -322,6 +332,8 @@ private fun YouTab(
     onUpgrade: () -> Unit,
     onManageSubscription: () -> Unit,
     onNotificationsToggled: (Boolean) -> Unit,
+    themeMode: com.example.ui.theme.ThemeMode,
+    onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
 ) {
     var showBadges by rememberSaveable { mutableStateOf(true) }
 
@@ -341,6 +353,8 @@ private fun YouTab(
         } else {
             SettingsScreen(
                 profile = profile,
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange,
                 onUpdateProfile = viewModel::updateProfileDetails,
                 onNotificationsChanged = {
                     viewModel.setNotificationsEnabled(it)

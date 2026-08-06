@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UserProfileEntity
+import com.example.ui.theme.ThemeMode
 import com.example.ui.components.*
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
@@ -30,6 +31,8 @@ import com.example.ui.theme.Space
 @Composable
 fun SettingsScreen(
     profile: UserProfileEntity,
+    themeMode: ThemeMode = ThemeMode.System,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     onUpdateProfile: (name: String, babyName: String, diet: String) -> Unit,
     onNotificationsChanged: (Boolean) -> Unit,
     onWaterGoalChanged: (Int) -> Unit,
@@ -96,6 +99,31 @@ fun SettingsScreen(
                     }
                     Text("→", color = PregaTheme.colors.inkFaint, fontSize = 18.sp)
                 }
+            }
+        }
+
+        Spacer(Modifier.height(Space.xl))
+
+        // ── Appearance ──
+        SectionHeader(title = "Appearance", overline = "Display")
+        Spacer(Modifier.height(Space.md))
+        PregaCard {
+            Text(
+                "Theme",
+                style = MaterialTheme.typography.titleMedium,
+                color = PregaTheme.colors.ink,
+            )
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                "Dark is easier on your eyes at night. System follows your phone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkMuted,
+            )
+            Spacer(Modifier.height(Space.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                PregaChip("System", themeMode == ThemeMode.System, { onThemeModeChange(ThemeMode.System) })
+                PregaChip("Light", themeMode == ThemeMode.Light, { onThemeModeChange(ThemeMode.Light) })
+                PregaChip("Dark", themeMode == ThemeMode.Dark, { onThemeModeChange(ThemeMode.Dark) })
             }
         }
 

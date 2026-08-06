@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -349,19 +350,30 @@ private fun GoogleSignInRow(status: GoogleSignInStatus, onClick: () -> Unit) {
             }
 
             else -> {
+                // Same weight class as the primary button — full width, same
+                // height — so signing in reads as a real choice, not fine
+                // print. Still optional: "Begin" above works without it.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .clickable(onClick = onClick)
-                        .padding(horizontal = Space.lg, vertical = Space.sm),
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(percent = 50))
+                        .background(PregaTheme.colors.cardSurface)
+                        .border(
+                            1.5.dp,
+                            PregaTheme.colors.hairline,
+                            androidx.compose.foundation.shape.RoundedCornerShape(percent = 50),
+                        )
+                        .clickable(onClick = onClick),
                 ) {
                     GoogleGlyph()
                     Spacer(Modifier.width(Space.sm))
                     Text(
                         "Continue with Google",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = PregaTheme.colors.inkMuted,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = PregaTheme.colors.ink,
                     )
                 }
             }
