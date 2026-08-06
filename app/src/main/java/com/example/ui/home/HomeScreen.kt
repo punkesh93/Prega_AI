@@ -366,9 +366,16 @@ private fun WeekHero(
         onClick = onClick,
         containerColor = PregaTheme.colors.terracottaSoft,
         border = false,
-        contentPadding = PaddingValues(Space.lg),
+        contentPadding = PaddingValues(0.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
+      Box {
+        // Abstract calm: soft cream blobs bleeding off the top-right corner.
+        CornerBlobs(
+            tint = PregaTheme.colors.cardSurface,
+            modifier = Modifier.matchParentSize(),
+        )
+        Column(Modifier.padding(Space.lg)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 // Trimester as a small tinted chip, not a card-wide colour.
@@ -447,6 +454,8 @@ private fun WeekHero(
             style = MaterialTheme.typography.labelMedium,
             color = PregaTheme.colors.terracotta,
         )
+        }
+      }
     }
 }
 
@@ -510,8 +519,18 @@ private fun AffirmationCard(text: String) {
     GradientCard(
         brush = PregaTheme.colors.goldBrush,
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(Space.lg),
+        contentPadding = PaddingValues(0.dp),
     ) {
+      Box {
+        LeafSprig(
+            color = Color.White.copy(alpha = 0.35f),
+            rotationDegrees = 12f,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(84.dp)
+                .padding(end = Space.sm),
+        )
+        Column(Modifier.padding(Space.lg)) {
         Overline("Today's affirmation", color = Color.White.copy(alpha = 0.85f))
         Spacer(Modifier.height(Space.sm))
         Text(
@@ -519,6 +538,8 @@ private fun AffirmationCard(text: String) {
             style = MaterialTheme.typography.headlineSmall,
             color = Color.White,
         )
+        }
+      }
     }
 }
 

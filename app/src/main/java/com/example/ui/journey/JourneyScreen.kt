@@ -81,13 +81,18 @@ fun JourneyScreen(
 
 @Composable
 private fun RingHeader(currentWeek: Int) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Fit-for-all-screens: the ring scales with the device instead of
+        // assuming a 216dp circle fits. On a narrow phone (or split screen)
+        // it shrinks; it never exceeds its designed size on a large one.
+        val ringSize = (maxWidth * 0.62f).coerceIn(160.dp, 232.dp)
     Column(
         Modifier
             .fillMaxWidth()
             .padding(bottom = Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BloomRing(currentWeek = currentWeek, size = 216.dp) {
+        BloomRing(currentWeek = currentWeek, size = ringSize) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     "$currentWeek",
@@ -110,6 +115,7 @@ private fun RingHeader(currentWeek: Int) {
             LegendDot(BloomRingColors.second, "2nd")
             LegendDot(BloomRingColors.third, "3rd")
         }
+    }
     }
 }
 
