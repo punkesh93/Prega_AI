@@ -7,6 +7,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocalFlorist
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.LocalFlorist
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,12 +63,42 @@ import java.time.temporal.ChronoUnit
  * distracted.
  */
 
-private enum class Tab(val label: String, val emoji: String) {
-    Today("Today", "🌸"),
-    Journey("Journey", "🗓"),
-    Kicks("Kicks", "👣"),
-    Coach("Coach", "💬"),
-    You("You", "👤"),
+/**
+ * Tab icons are real vectors, not emoji. Emoji render differently on every
+ * manufacturer's phone and can't be tinted to reflect selection state; icons
+ * from the Material set are consistent everywhere and take theme colour.
+ * Filled variant when selected, outlined when not — the standard affordance.
+ */
+private enum class Tab(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val iconSelected: androidx.compose.ui.graphics.vector.ImageVector,
+) {
+    Today(
+        "Today",
+        Icons.Outlined.LocalFlorist,
+        Icons.Filled.LocalFlorist,
+    ),
+    Journey(
+        "Journey",
+        Icons.Outlined.Timeline,
+        Icons.Filled.Timeline,
+    ),
+    Kicks(
+        "Kicks",
+        Icons.Outlined.FavoriteBorder,
+        Icons.Filled.Favorite,
+    ),
+    Coach(
+        "Coach",
+        Icons.AutoMirrored.Outlined.Chat,
+        Icons.AutoMirrored.Filled.Chat,
+    ),
+    You(
+        "You",
+        Icons.Outlined.Person,
+        Icons.Filled.Person,
+    ),
 }
 
 @Composable
@@ -318,9 +359,10 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
                 selected = isSelected,
                 onClick = { onSelect(tab) },
                 icon = {
-                    Text(
-                        tab.emoji,
-                        fontSize = if (isSelected) 21.sp else 19.sp,
+                    Icon(
+                        imageVector = if (isSelected) tab.iconSelected else tab.icon,
+                        contentDescription = tab.label,
+                        modifier = Modifier.size(24.dp),
                     )
                 },
                 label = {
@@ -330,6 +372,8 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = PregaTheme.colors.inkFaint,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedTextColor = PregaTheme.colors.inkFaint,
                     indicatorColor = MaterialTheme.colorScheme.primaryContainer,

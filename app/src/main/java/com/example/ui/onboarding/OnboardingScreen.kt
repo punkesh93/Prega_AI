@@ -228,6 +228,18 @@ private fun PageScaffold(
 
 @Composable
 private fun WelcomePage(onNext: () -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        // The signature ambient moment: petals drifting slowly behind the
+        // hero. Used here and on the badge reveal only — ambience on every
+        // screen stops being ambience.
+        PetalDrift(Modifier.fillMaxSize())
+
+        WelcomeContent(onNext)
+    }
+}
+
+@Composable
+private fun WelcomeContent(onNext: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()

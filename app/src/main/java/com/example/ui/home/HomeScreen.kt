@@ -8,12 +8,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -374,18 +378,50 @@ private fun CheckCircle(checked: Boolean) {
         animationSpec = Motion.playful(),
         label = "checkScale",
     )
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(
-                if (checked) MaterialTheme.colorScheme.secondary
-                else PregaTheme.colors.recessed
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) {
-            Text("✓", fontSize = (14 * scale).coerceAtLeast(1f).sp, color = Color.White)
+
+    // Six tiny petals burst outward once, on the transition to checked.
+    var burst by remember { mutableStateOf(false) }
+    LaunchedEffect(checked) { burst = checked }
+    val burstT by animateFloatAsState(
+        targetValue = if (burst) 1f else 0f,
+        animationSpec = tween(Motion.Slow, easing = Motion.EaseEnter),
+        label = "burstT",
+    )
+
+    Box(contentAlignment = Alignment.Center) {
+        if (checked && burstT > 0f && burstT < 1f) {
+            androidx.compose.foundation.Canvas(Modifier.size(52.dp)) {
+                val centre = androidx.compose.ui.geometry.Offset(
+                    size.width / 2f, size.height / 2f
+                )
+                repeat(6) { i ->
+                    val angle = Math.toRadians(i * 60.0 - 90.0)
+                    val dist = 22f * burstT
+                    drawCircle(
+                        color = Color(0xFF7A9E7E).copy(alpha = (1f - burstT) * 0.8f),
+                        radius = 3f * (1f - burstT * 0.5f),
+                        center = androidx.compose.ui.geometry.Offset(
+                            centre.x + (kotlin.math.cos(angle) * dist).toFloat(),
+                            centre.y + (kotlin.math.sin(angle) * dist).toFloat(),
+                        ),
+                    )
+                }
+            }
+        }
+
+        Box(
+            Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(
+                    if (checked) MaterialTheme.colorScheme.secondary
+                    else PregaTheme.colors.recessed
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Text("✓", fontSize = (14 * scale).coerceAtLeast(1f).sp, color = Color.White)
+            }
         }
     }
 }
@@ -405,24 +441,17 @@ private fun QuickLog(
         Spacer(Modifier.height(Space.md))
 
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            // Water — tapping adds a glass. No modal, no number pad.
-            QuickTile(
+            // Water — the tile is a vessel that visibly fills as she taps.
+            WaterTile(
+                glasses = log?.waterGlasses ?: 0,
+                goal = goal,
+                onTap = onWater,
                 modifier = Modifier.weight(1f),
-                emoji = "💧",
-                label = "Water",
-                value = "${log?.waterGlasses ?: 0} / $goal",
-                progress = ((log?.waterGlasses ?: 0).toFloat() / goal).coerceIn(0f, 1f),
-                tint = PregaTheme.colors.lavenderSoft,
-                onClick = onWater,
             )
-            QuickTile(
+            VitaminsTile(
+                taken = log?.tookVitamins == true,
+                onTap = onVitamins,
                 modifier = Modifier.weight(1f),
-                emoji = if (log?.tookVitamins == true) "✅" else "💊",
-                label = "Vitamins",
-                value = if (log?.tookVitamins == true) "Taken" else "Not yet",
-                progress = if (log?.tookVitamins == true) 1f else 0f,
-                tint = PregaTheme.colors.goldSoft,
-                onClick = onVitamins,
             )
         }
 
@@ -508,28 +537,49 @@ private fun MoodOption(emoji: String, label: String, selected: Boolean, onClick:
 }
 
 @Composable
-private fun QuickTile(
-    emoji: String,
-    label: String,
-    value: String,
-    progress: Float,
-    tint: Color,
-    onClick: () -> Unit,
+private fun VitaminsTile(
+    taken: Boolean,
+    onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The icon swap (pill -> tick) plus a colour shift is the state change;
+    // the pop spring makes ticking it feel like an accomplishment.
+    val iconScale by animateFloatAsState(
+        targetValue = if (taken) 1f else 0.92f,
+        animationSpec = Motion.playful(),
+        label = "vitaminScale",
+    )
+
     PregaCard(
-        modifier = modifier,
-        onClick = onClick,
-        containerColor = tint,
+        modifier = modifier.heightIn(min = 128.dp),
+        onClick = onTap,
+        containerColor = if (taken) PregaTheme.colors.successSoft
+        else PregaTheme.colors.goldSoft,
         border = false,
         contentPadding = PaddingValues(Space.lg),
     ) {
-        Text(emoji, fontSize = 24.sp)
+        Icon(
+            imageVector = if (taken) Icons.Filled.CheckCircle
+            else Icons.Outlined.Medication,
+            contentDescription = null,
+            tint = if (taken) PregaTheme.colors.success else PregaTheme.colors.gold,
+            modifier = Modifier
+                .size(26.dp)
+                .graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+        )
         Spacer(Modifier.height(Space.sm))
-        Text(label, style = MaterialTheme.typography.bodySmall, color = PregaTheme.colors.inkMuted)
-        Text(value, style = MaterialTheme.typography.titleLarge, color = PregaTheme.colors.ink)
-        Spacer(Modifier.height(Space.sm))
-        PregaProgressBar(progress = progress, height = 4.dp)
+        Text("Vitamins", style = MaterialTheme.typography.bodySmall, color = PregaTheme.colors.inkMuted)
+        Text(
+            if (taken) "Taken" else "Not yet",
+            style = MaterialTheme.typography.titleLarge,
+            color = PregaTheme.colors.ink,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            if (taken) "Nice one" else "Tap when you have",
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
     }
 }
 
@@ -630,7 +680,15 @@ private fun ProgressSection(progress: ProgressEntity) {
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Stat("🔥", "${progress.currentStreak}", "day streak")
+                // A live streak breathes; a broken one sits still. The flame
+                // only animates when there is something to celebrate.
+                if (progress.currentStreak > 0) {
+                    Breathing(minScale = 0.94f, maxScale = 1.06f) {
+                        Stat("🔥", "${progress.currentStreak}", "day streak")
+                    }
+                } else {
+                    Stat("🔥", "${progress.currentStreak}", "day streak")
+                }
                 Stat("🏅", "${progress.longestStreak}", "best ever")
                 // Surfaced deliberately: knowing she has grace days in hand is
                 // what stops a streak becoming a source of pressure.

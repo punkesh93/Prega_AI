@@ -46,8 +46,9 @@ fun JourneyScreen(
     val weeks = remember { (1..40).toList() }
 
     LaunchedEffect(currentWeek) {
-        // Land a week early so "now" isn't jammed against the top edge.
-        listState.scrollToItem((currentWeek - 2).coerceAtLeast(0))
+        // +1 accounts for the ring header item; land a week early so "now"
+        // isn't jammed against the top edge.
+        listState.scrollToItem((currentWeek - 1).coerceAtLeast(0))
     }
 
     LazyColumn(
@@ -62,6 +63,10 @@ fun JourneyScreen(
             bottom = Space.navClearance,
         ),
     ) {
+        item(key = "bloom_ring") {
+            RingHeader(currentWeek)
+        }
+
         items(weeks, key = { it }) { week ->
             WeekRow(
                 info = weekInfoFor(week),
@@ -71,6 +76,58 @@ fun JourneyScreen(
                 isLast = week == 40,
             )
         }
+    }
+}
+
+@Composable
+private fun RingHeader(currentWeek: Int) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = Space.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BloomRing(currentWeek = currentWeek, size = 216.dp) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "$currentWeek",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = PregaTheme.colors.ink,
+                )
+                Text(
+                    "of 40 weeks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Space.md))
+
+        // Trimester legend, so the ring's colour bands explain themselves.
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
+            LegendDot(BloomRingColors.first, "1st")
+            LegendDot(BloomRingColors.second, "2nd")
+            LegendDot(BloomRingColors.third, "3rd")
+        }
+    }
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(Modifier.width(Space.xs))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
     }
 }
 

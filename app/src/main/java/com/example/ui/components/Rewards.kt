@@ -123,6 +123,7 @@ fun BadgeReveal(
             .clickable(interactionSource = interaction, indication = null, onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
+        PetalDrift(Modifier.fillMaxSize(), petalCount = 8, tint = Color.White)
         Confetti(tier = badge.tier)
 
         Column(
