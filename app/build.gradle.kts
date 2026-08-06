@@ -21,6 +21,10 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Room schema export — lets us write migration tests against real
+    // historical schemas instead of guessing.
+    ksp { arg("room.schemaLocation", "$projectDir/schemas") }
   }
 
   signingConfigs {
@@ -41,8 +45,9 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -53,6 +58,9 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
+    // Required so java.time (used throughout the gamification + scheduling
+    // logic) works on minSdk 24 rather than only on API 26+.
+    isCoreLibraryDesugaringEnabled = true
   }
   buildFeatures {
     compose = true
@@ -125,6 +133,10 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.billing.ktx)
+  coreLibraryDesugaring(libs.desugar.jdk.libs)
+  testImplementation(libs.androidx.room.testing)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }

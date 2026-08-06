@@ -3,8 +3,13 @@ package com.example.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.ai.GeminiClient
+import com.example.ai.AiMessage
+import com.example.ai.AiResult
+import com.example.ai.OpenRouterClient
+import com.example.ai.PregaModel
+import com.example.ai.PregaPrompts
 import com.example.data.*
+import com.example.domain.GamificationEngine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -16,8 +21,23 @@ data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    /** The canned opener. Excluded from AI history so it can't skew replies. */
+    val isGreeting: Boolean = false,
 )
+
+/**
+ * One-shot UI events emitted after a rewarded action. Kept separate from state
+ * so a celebration fires exactly once and is never replayed on rotation.
+ */
+sealed interface RewardEvent {
+    data class Points(val amount: Int, val reason: String) : RewardEvent
+    data class BadgeEarned(val badge: BadgeDef) : RewardEvent
+    data class StreakExtended(val days: Int) : RewardEvent
+    /** A grace day was spent to protect her streak. Framed as care, not a loss. */
+    data class StreakProtected(val remaining: Int) : RewardEvent
+    data class LevelUp(val level: Int, val title: String) : RewardEvent
+}
 
 data class WeekInfo(
     val week: Int,
@@ -30,6 +50,8 @@ data class WeekInfo(
 )
 
 class PregnancyViewModel(private val repository: PregnancyRepository) : ViewModel() {
+
+    private val gamification = GamificationEngine(repository)
 
     // --- State Observables ---
     val profile: StateFlow<UserProfileEntity?> = repository.getUserProfile()
@@ -45,12 +67,40 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     val kickLogs: StateFlow<List<KickLogEntity>> = repository.getAllKickLogs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // --- Gamification State ---
+    /** One-shot events the UI consumes to fire confetti, toasts, badge reveals. */
+    private val _rewards = MutableSharedFlow<RewardEvent>(extraBufferCapacity = 8)
+    val rewards: SharedFlow<RewardEvent> = _rewards.asSharedFlow()
+
+    val progress: StateFlow<ProgressEntity> = repository.getProgress()
+        .map { it ?: ProgressEntity() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProgressEntity())
+
+    val badges: StateFlow<List<BadgeEntity>> = repository.getBadges()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val todayQuests: StateFlow<List<QuestEntity>> = _todayDate
+        .flatMapLatest { date -> repository.getQuestsForDate(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val moodToday: StateFlow<MoodEntity?> = _todayDate
+        .flatMapLatest { date -> repository.getMood(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val appointments: StateFlow<List<AppointmentEntity>> = repository.getAppointments()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val nextAppointment: StateFlow<AppointmentEntity?> = _todayDate
+        .flatMapLatest { date -> repository.getNextAppointment(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     // --- AI Coach Chat State ---
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(
         listOf(
             ChatMessage(
-                text = "Hello! I am your Prega AI Coach. Ask me anything about your trimester, pregnancy nutrition, symptoms, or prenatal exercises. (Remember: I'm here for support, not medical diagnosis!)",
-                isUser = false
+                text = GREETING,
+                isUser = false,
+                isGreeting = true,
             )
         )
     )
@@ -167,8 +217,9 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             // Reset chat messages
             _chatMessages.value = listOf(
                 ChatMessage(
-                    text = "Hello! I am your Prega AI Coach. Ask me anything about your trimester, pregnancy nutrition, symptoms, or prenatal exercises. (Remember: I'm here for support, not medical diagnosis!)",
-                    isUser = false
+                    text = GREETING,
+                    isUser = false,
+                    isGreeting = true,
                 )
             )
         }
@@ -176,14 +227,13 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
 
     fun deleteAllUserData() {
         viewModelScope.launch {
-            repository.deleteUserProfile()
-            repository.deleteAllDailyLogs()
-            repository.deleteAllKickLogs()
+            repository.deleteEverything()
             // Reset chat messages
             _chatMessages.value = listOf(
                 ChatMessage(
-                    text = "Hello! I am your Prega AI Coach. Ask me anything about your trimester, pregnancy nutrition, symptoms, or prenatal exercises. (Remember: I'm here for support, not medical diagnosis!)",
-                    isUser = false
+                    text = GREETING,
+                    isUser = false,
+                    isGreeting = true,
                 )
             )
         }
@@ -237,6 +287,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         viewModelScope.launch {
             val log = getOrCreateTodayLog()
             repository.saveDailyLog(log.copy(waterGlasses = log.waterGlasses + 1))
+            award(GamificationEngine.Action.LogWater, profile.value?.currentWeek ?: 12, "Water logged")
         }
     }
 
@@ -252,7 +303,12 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     fun toggleVitamins() {
         viewModelScope.launch {
             val log = getOrCreateTodayLog()
-            repository.saveDailyLog(log.copy(tookVitamins = !log.tookVitamins))
+            val nowTaken = !log.tookVitamins
+            repository.saveDailyLog(log.copy(tookVitamins = nowTaken))
+            // Only reward turning it on — un-ticking is a correction, not a failure.
+            if (nowTaken) {
+                award(GamificationEngine.Action.LogVitamins, profile.value?.currentWeek ?: 12, "Vitamins logged")
+            }
         }
     }
 
@@ -260,13 +316,20 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         viewModelScope.launch {
             val log = getOrCreateTodayLog()
             repository.saveDailyLog(log.copy(sleptHours = hours))
+            award(GamificationEngine.Action.LogSleep, profile.value?.currentWeek ?: 12, "Sleep logged")
         }
     }
 
+    /**
+     * Weight is recorded but never gamified — no points, no streak, no badge.
+     * Attaching rewards to a number on a scale during pregnancy is exactly the
+     * kind of pressure this app should not create.
+     */
     fun updateWeight(weight: Float) {
         viewModelScope.launch {
             val log = getOrCreateTodayLog()
             repository.saveDailyLog(log.copy(weightKg = weight))
+            repository.saveWeight(WeightEntity(date = _todayDate.value, weightKg = weight))
         }
     }
 
@@ -312,13 +375,15 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
 
         if (count > 0) {
             viewModelScope.launch {
-                val kickLog = KickLogEntity(
-                    date = _todayDate.value,
-                    timestamp = System.currentTimeMillis(),
-                    count = count,
-                    durationSeconds = seconds
+                repository.saveKickLog(
+                    KickLogEntity(
+                        date = _todayDate.value,
+                        timestamp = System.currentTimeMillis(),
+                        count = count,
+                        durationSeconds = seconds,
+                    )
                 )
-                repository.saveKickLog(kickLog)
+                award(GamificationEngine.Action.KickSession, profile.value?.currentWeek ?: 12, "Kick session saved")
             }
         }
     }
@@ -339,45 +404,76 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     // --- AI Coach Chat Operations ---
     fun askCoach(question: String) {
         if (question.isBlank()) return
-        val userMsg = ChatMessage(text = question, isUser = true)
-        _chatMessages.value = _chatMessages.value + userMsg
-        _chatLoading.value = true
+        if (_chatLoading.value) return  // guard against double-submit
 
-        val systemInstruction = """
-            You are "Prega AI Coach", a supportive, warm, and comforting pregnancy wellness companion.
-            Provide information about pregnancy trimesters, symptom remedies (nausea, sleep issues), light prenatal exercises, and nutrition.
-            
-            RULES:
-            1. Emphasize that you are an AI assistant and NOT a doctor.
-            2. For severe symptoms (like sharp pain, severe bleeding, continuous headaches), strongly urge the user to contact their OB-GYN immediately.
-            3. Answer warmly, empathetically, and clearly, with short, easy-to-read formatting (bullet points, spaced paragraphs).
-        """.trimIndent()
+        _chatMessages.value = _chatMessages.value + ChatMessage(text = question, isUser = true)
+        _chatLoading.value = true
 
         viewModelScope.launch {
             val currentProfile = profile.value
+            val week = currentProfile?.currentWeek ?: 12
+            val trimester = trimesterFor(week)
+
+            // Free-tier gate. Premium is granted only by the billing client.
             if (currentProfile != null && !currentProfile.isPremium) {
                 if (currentProfile.freeQuestionsRemaining <= 0) {
-                    val upgradeMsg = ChatMessage(
-                        text = "Prega AI Coach: You have reached the limit of 5 free AI questions for your trial! Please tap the 'Upgrade to Premium' banner above or in Settings to unlock unlimited questions, personalized weekly meal plans, and kick metrics reports. 🤰💖✨",
-                        isUser = false
+                    _chatMessages.value = _chatMessages.value + ChatMessage(
+                        text = "You've used your free questions for now. Premium unlocks " +
+                            "unlimited questions, weekly meal plans tailored to how you're " +
+                            "actually feeling, and your full kick history.",
+                        isUser = false,
                     )
-                    _chatMessages.value = _chatMessages.value + upgradeMsg
                     _chatLoading.value = false
                     return@launch
                 }
-                // Decrement free questions remaining
-                val updatedProfile = currentProfile.copy(
-                    freeQuestionsRemaining = currentProfile.freeQuestionsRemaining - 1
+                repository.saveUserProfile(
+                    currentProfile.copy(
+                        freeQuestionsRemaining = currentProfile.freeQuestionsRemaining - 1
+                    )
                 )
-                repository.saveUserProfile(updatedProfile)
             }
 
-            val response = GeminiClient.askGemini(question, systemInstruction)
-            val coachMsg = ChatMessage(text = response, isUser = false)
-            _chatMessages.value = _chatMessages.value + coachMsg
+            // Real conversation history, so follow-up questions actually work.
+            val history = _chatMessages.value
+                .dropLast(1)
+                .filterNot { it.isGreeting }
+                .map { AiMessage(if (it.isUser) "user" else "assistant", it.text) }
+
+            val result = OpenRouterClient.complete(
+                systemPrompt = PregaPrompts.coach(
+                    week = week,
+                    trimester = trimester,
+                    babyName = currentProfile?.babyNamePlaceholder.orEmpty(),
+                    name = currentProfile?.name.orEmpty(),
+                ),
+                userPrompt = question,
+                history = history,
+                model = PregaModel.Conversational,
+                temperature = 0.7,
+            )
+
+            val reply = when (result) {
+                is AiResult.Success -> result.text
+                is AiResult.NotConfigured -> OFFLINE_COACH_REPLY
+                is AiResult.Failure -> "I couldn't reach my notes just now — ${result.reason}" +
+                    if (result.retryable) " Try asking again in a moment." else ""
+            }
+
+            _chatMessages.value = _chatMessages.value + ChatMessage(text = reply, isUser = false)
             _chatLoading.value = false
+
+            if (result is AiResult.Success) {
+                award(GamificationEngine.Action.AskCoach, week, "Question asked")
+            }
         }
     }
+
+    /** Shown when no API key is configured, so the feature degrades gracefully. */
+    private val OFFLINE_COACH_REPLY =
+        "I can't reach my AI service right now — no API key is configured. " +
+        "Everything else in the app works offline: your logs, kick counter, " +
+        "quests and journey are all saved on your device.\n\n" +
+        "For anything that worries you, your midwife or OB-GYN is the right call."
 
     // --- AI Weekly Meal Plan ---
     private val _weeklyMealPlan = MutableStateFlow<String?>(null)
@@ -387,23 +483,71 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     val mealPlanLoading: StateFlow<Boolean> = _mealPlanLoading.asStateFlow()
 
     fun generateWeeklyMealPlan(currentWeek: Int, babyNickname: String) {
+        if (_mealPlanLoading.value) return
         _mealPlanLoading.value = true
-        val systemInstruction = """
-            You are a prenatal nutritionist and dietitian expert.
-            Generate a personalized, medically-vetted, day-by-day weekly meal plan for a pregnant mother in Week $currentWeek of her pregnancy (baby's nickname: $babyNickname).
-            Include Breakfast, Lunch, Snack, and Dinner for each day (Monday through Sunday).
-            Incorporate key pregnancy superfoods like eggs, yogurt, salmon, and spinach.
-            Highlight the specific benefits of nutrients (like Folate, Choline, Iron, Calcium) for this week of baby development.
-            Format beautifully with clear headings, daily bullet points, and an encouraging closing message.
-        """.trimIndent()
 
         viewModelScope.launch {
-            val response = GeminiClient.askGemini(
-                prompt = "Please generate my personalized week $currentWeek prenatal weekly meal plan now. Include daily meals, portion guides, and essential nutrient highlights.",
-                systemPrompt = systemInstruction
+            val p = profile.value
+            // Feed today's logged symptoms in, so the plan works around how she
+            // actually feels rather than an idealised week.
+            val symptoms = todayLog.value?.symptoms?.replace(",", ", ").orEmpty()
+
+            val result = OpenRouterClient.complete(
+                systemPrompt = PregaPrompts.mealPlan(
+                    week = currentWeek,
+                    trimester = trimesterFor(currentWeek),
+                    babyName = babyNickname,
+                    name = p?.name.orEmpty(),
+                    preferences = p?.dietaryPreferences.orEmpty(),
+                    symptoms = symptoms,
+                ),
+                userPrompt = "Build my week $currentWeek meal plan.",
+                model = PregaModel.Conversational,
+                temperature = 0.8,
+                maxTokens = 2000,
             )
-            _weeklyMealPlan.value = response
+
+            _weeklyMealPlan.value = when (result) {
+                is AiResult.Success -> result.text
+                is AiResult.NotConfigured -> null
+                is AiResult.Failure -> null
+            }
+            _mealPlanError.value = when (result) {
+                is AiResult.NotConfigured -> "AI isn't configured on this build."
+                is AiResult.Failure -> result.reason
+                else -> null
+            }
             _mealPlanLoading.value = false
+        }
+    }
+
+    private val _mealPlanError = MutableStateFlow<String?>(null)
+    val mealPlanError: StateFlow<String?> = _mealPlanError.asStateFlow()
+
+    // --- Daily AI insight (home screen) ---
+    private val _dailyInsight = MutableStateFlow<String?>(null)
+    val dailyInsight: StateFlow<String?> = _dailyInsight.asStateFlow()
+
+    /**
+     * Regenerated once per day. The prompt explicitly rotates its angle so two
+     * consecutive days never read the same.
+     */
+    fun refreshDailyInsight() {
+        viewModelScope.launch {
+            val p = profile.value ?: return@launch
+            val week = p.currentWeek
+            _dailyInsight.value = OpenRouterClient.completeOrNull(
+                systemPrompt = PregaPrompts.dailyInsight(
+                    week = week,
+                    trimester = trimesterFor(week),
+                    babyName = p.babyNamePlaceholder,
+                    name = p.name,
+                ),
+                userPrompt = "Today is ${_todayDate.value}. Give me today's insight.",
+                model = PregaModel.Quick,
+                temperature = 1.0,
+                maxTokens = 120,
+            )
         }
     }
 
@@ -759,6 +903,192 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 trimester = trimester
             )
         }
+    }
+
+    // ─── Shared helpers ───────────────────────────────────────────────────
+
+    private fun trimesterFor(week: Int): Int = when {
+        week <= 13 -> 1
+        week <= 27 -> 2
+        else -> 3
+    }
+
+    /**
+     * Runs a rewarded action through the gamification engine and emits whatever
+     * the UI should celebrate. Every tracked interaction funnels through here so
+     * points, streaks and badges can never drift out of sync.
+     */
+    private fun award(
+        action: GamificationEngine.Action,
+        week: Int,
+        reason: String,
+    ) {
+        viewModelScope.launch {
+            val logs = repository.getAllDailyLogs().first()
+            val goal = profile.value?.waterGoalGlasses ?: 8
+
+            val outcome = gamification.recordAction(
+                action = action,
+                currentWeek = week,
+                waterGoalHits = logs.count { it.waterGlasses >= goal },
+                vitaminDays = logs.count { it.tookVitamins },
+                sleepDays = logs.count { it.sleptHours > 0f },
+            )
+
+            if (outcome.pointsAwarded > 0) {
+                _rewards.emit(RewardEvent.Points(outcome.pointsAwarded, reason))
+            }
+            if (outcome.streakIncreased) {
+                _rewards.emit(RewardEvent.StreakExtended(outcome.progress.currentStreak))
+            }
+            if (outcome.freezeUsed) {
+                _rewards.emit(RewardEvent.StreakProtected(outcome.progress.streakFreezes))
+            }
+            if (outcome.levelledUp) {
+                _rewards.emit(
+                    RewardEvent.LevelUp(outcome.progress.level, outcome.progress.levelTitle)
+                )
+            }
+            outcome.newBadges.forEach { _rewards.emit(RewardEvent.BadgeEarned(it)) }
+        }
+    }
+
+    /** Call from the host activity on each launch so the streak resolves once. */
+    fun onAppOpened() {
+        viewModelScope.launch {
+            val week = profile.value?.currentWeek ?: 12
+            award(GamificationEngine.Action.DailyOpen, week, "Welcome back")
+            ensureQuestsForToday()
+            refreshDailyInsight()
+            repository.pruneQuestsBefore(_todayDate.value)
+        }
+    }
+
+    // ─── Daily quests ─────────────────────────────────────────────────────
+
+    /**
+     * Generates today's quests if they don't exist yet. Falls back to a curated
+     * offline pool so the feature never simply vanishes without a network.
+     */
+    private suspend fun ensureQuestsForToday() {
+        val date = _todayDate.value
+        if (repository.getQuestsForDateOnce(date).isNotEmpty()) return
+
+        val p = profile.value
+        val week = p?.currentWeek ?: 12
+
+        val generated = OpenRouterClient.completeOrNull(
+            systemPrompt = PregaPrompts.questCopy(
+                week = week,
+                trimester = trimesterFor(week),
+                babyName = p?.babyNamePlaceholder.orEmpty(),
+                name = p?.name.orEmpty(),
+            ),
+            userPrompt = "Give me today's three quests.",
+            model = PregaModel.Quick,
+            temperature = 1.0,
+            maxTokens = 250,
+        )
+
+        val quests = generated?.let(::parseQuests)?.takeIf { it.size == 3 }
+            ?: FallbackQuests.POOL.shuffled().take(3).map { it.first to it.second }
+
+        repository.saveQuests(
+            quests.mapIndexed { i, (title, why) ->
+                QuestEntity(
+                    id = "$date-$i",
+                    date = date,
+                    title = title,
+                    rationale = why,
+                )
+            }
+        )
+    }
+
+    /** Parses the `QUEST: ... | WHY: ...` lines the prompt asks for. */
+    private fun parseQuests(raw: String): List<Pair<String, String>> =
+        raw.lineSequence()
+            .filter { it.contains("QUEST:", ignoreCase = true) }
+            .mapNotNull { line ->
+                val quest = line.substringAfter("QUEST:", "").substringBefore("|").trim()
+                val why = line.substringAfter("WHY:", "").trim()
+                if (quest.isBlank()) null else quest to why
+            }
+            .toList()
+
+    fun completeQuest(quest: QuestEntity) {
+        if (quest.completed) return
+        viewModelScope.launch {
+            repository.updateQuest(quest.copy(completed = true))
+            award(
+                GamificationEngine.Action.CompleteQuest,
+                profile.value?.currentWeek ?: 12,
+                "Quest complete",
+            )
+        }
+    }
+
+    // ─── Mood ─────────────────────────────────────────────────────────────
+
+    fun logMood(mood: Int, note: String = "", tags: List<String> = emptyList()) {
+        viewModelScope.launch {
+            repository.saveMood(
+                MoodEntity(
+                    date = _todayDate.value,
+                    mood = mood.coerceIn(1, 5),
+                    note = note,
+                    tags = tags.joinToString(","),
+                )
+            )
+            award(GamificationEngine.Action.LogMood, profile.value?.currentWeek ?: 12, "Mood logged")
+        }
+    }
+
+    // ─── Appointments ─────────────────────────────────────────────────────
+
+    fun saveAppointment(appointment: AppointmentEntity) {
+        viewModelScope.launch {
+            repository.saveAppointment(appointment)
+            if (appointment.id == 0) {
+                award(
+                    GamificationEngine.Action.LogAppointment,
+                    profile.value?.currentWeek ?: 12,
+                    "Appointment saved",
+                )
+            }
+        }
+    }
+
+    fun deleteAppointment(id: Int) {
+        viewModelScope.launch { repository.deleteAppointment(id) }
+    }
+
+    // ─── Contractions ─────────────────────────────────────────────────────
+
+    val contractions: StateFlow<List<ContractionEntity>> = repository.getContractions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun logContraction(durationSeconds: Int, intensity: Int) {
+        viewModelScope.launch {
+            val previous = contractions.value.firstOrNull()
+            val now = System.currentTimeMillis()
+            val interval = previous?.let { ((now - it.startTime) / 1000).toInt() } ?: 0
+            repository.saveContraction(
+                ContractionEntity(
+                    startTime = now,
+                    durationSeconds = durationSeconds,
+                    intervalSeconds = interval,
+                    intensity = intensity.coerceIn(1, 3),
+                )
+            )
+        }
+    }
+
+    companion object {
+        const val GREETING =
+            "I'm here whenever you need me — questions about how you're feeling, " +
+            "what's normal this week, food, sleep, any of it. I'm not a doctor, " +
+            "so anything that worries you goes to your midwife or OB-GYN first."
     }
 }
 
