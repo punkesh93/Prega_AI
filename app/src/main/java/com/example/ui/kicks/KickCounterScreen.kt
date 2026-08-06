@@ -190,7 +190,14 @@ private fun ActiveSession(
 @Composable
 private fun IdleState(history: List<KickLogEntity>, onStart: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Breathing { Text("👣", fontSize = 60.sp) }
+        // Our own footprint trail replaces the emoji — theme-tinted, drawn,
+        // and consistent on every device.
+        FootprintTrail(
+            color = PregaTheme.colors.terracotta.copy(alpha = 0.8f),
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .height(84.dp),
+        )
 
         Spacer(Modifier.height(Space.lg))
         Text(

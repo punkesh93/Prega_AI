@@ -278,7 +278,14 @@ private fun WelcomeContent(
     ) {
         Spacer(Modifier.weight(1f))
 
-        Breathing { Text("🌸", fontSize = 76.sp) }
+        // The welcome hero: our own line-art mother with the heart where the
+        // baby is — the app's first image is now of her, not a flower emoji.
+        Breathing(minScale = 0.985f, maxScale = 1.015f) {
+            MotherLineArt(
+                modifier = Modifier.size(190.dp),
+                line = PregaTheme.colors.ink.copy(alpha = 0.85f),
+            )
+        }
 
         Spacer(Modifier.height(Space.xl))
         Text(

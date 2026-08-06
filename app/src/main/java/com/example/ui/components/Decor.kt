@@ -99,3 +99,142 @@ fun LeafSprig(
         }
     }
 }
+
+/**
+ * Abstract line-art mother, side profile: an open head arc, a low bun, one
+ * back curve, and a generous belly sweep with a small heart where the baby
+ * is. Six curves total — the references' single-line hand-drawn language,
+ * not anatomy.
+ *
+ * The exact control points were prototyped as raster renders and visually
+ * judged across two iterations before landing here (v1's belly was too
+ * small to read "pregnant"; v2 fixed it). Draw at 160dp+ on cream; [line]
+ * defaults to warm umber, the heart to rose.
+ */
+@Composable
+fun MotherLineArt(
+    modifier: Modifier = Modifier,
+    line: Color = Color(0xFF7A6554),
+    heart: Color = Color(0xFFD87A84),
+) {
+    Canvas(modifier) {
+        val s = size.minDimension
+        val ox = (size.width - s) / 2f
+        val oy = (size.height - s) / 2f
+        fun p(x: Float, y: Float) = Offset(ox + x * s, oy + y * s)
+        val stroke = Stroke(width = (s * 0.019f).coerceAtLeast(3f), cap = StrokeCap.Round)
+
+        // Head: open arc facing right, gap at the chin-front.
+        val headC = p(0.46f, 0.14f)
+        val r = 0.095f * s
+        drawArc(
+            color = line,
+            startAngle = -60f,
+            sweepAngle = 295f,
+            useCenter = false,
+            topLeft = Offset(headC.x - r, headC.y - r),
+            size = androidx.compose.ui.geometry.Size(2 * r, 2 * r),
+            style = stroke,
+        )
+        // Low bun nestled at the back of the head.
+        val bunC = Offset(headC.x - r * 1.12f, headC.y + r * 0.15f)
+        val br = r * 0.38f
+        drawCircle(color = line, radius = br, center = bunC, style = stroke)
+
+        // Back: nape flowing down, then the seat curve forward.
+        drawPath(
+            Path().apply {
+                moveTo(p(0.375f, 0.225f).x, p(0.375f, 0.225f).y)
+                cubicTo(
+                    p(0.335f, 0.36f).x, p(0.335f, 0.36f).y,
+                    p(0.355f, 0.50f).x, p(0.355f, 0.50f).y,
+                    p(0.335f, 0.62f).x, p(0.335f, 0.62f).y,
+                )
+                cubicTo(
+                    p(0.32f, 0.76f).x, p(0.32f, 0.76f).y,
+                    p(0.42f, 0.84f).x, p(0.42f, 0.84f).y,
+                    p(0.56f, 0.85f).x, p(0.56f, 0.85f).y,
+                )
+            },
+            color = line, style = stroke,
+        )
+
+        // Front: chin -> chest dip -> the belly sweep -> under-belly.
+        drawPath(
+            Path().apply {
+                moveTo(p(0.515f, 0.235f).x, p(0.515f, 0.235f).y)
+                cubicTo(
+                    p(0.545f, 0.29f).x, p(0.545f, 0.29f).y,
+                    p(0.50f, 0.325f).x, p(0.50f, 0.325f).y,
+                    p(0.505f, 0.365f).x, p(0.505f, 0.365f).y,
+                )
+                cubicTo(
+                    p(0.70f, 0.40f).x, p(0.70f, 0.40f).y,
+                    p(0.76f, 0.58f).x, p(0.76f, 0.58f).y,
+                    p(0.63f, 0.70f).x, p(0.63f, 0.70f).y,
+                )
+                cubicTo(
+                    p(0.565f, 0.76f).x, p(0.565f, 0.76f).y,
+                    p(0.575f, 0.79f).x, p(0.575f, 0.79f).y,
+                    p(0.56f, 0.85f).x, p(0.56f, 0.85f).y,
+                )
+            },
+            color = line, style = stroke,
+        )
+
+        // The baby: a small filled heart inside the bump.
+        val h = p(0.615f, 0.53f)
+        val hs = 0.036f * s
+        val heartPath = Path()
+        for (i in 0..59) {
+            val t = i / 59f * 2f * Math.PI.toFloat()
+            val x = 16f * Math.sin(t.toDouble()).toFloat().let { it * it * it }
+            val y = (13f * Math.cos(t.toDouble()) - 5f * Math.cos(2.0 * t) -
+                2f * Math.cos(3.0 * t) - Math.cos(4.0 * t)).toFloat()
+            val px = h.x + x * hs / 16f
+            val py = h.y - y * hs / 16f
+            if (i == 0) heartPath.moveTo(px, py) else heartPath.lineTo(px, py)
+        }
+        heartPath.close()
+        drawPath(heartPath, color = heart)
+    }
+}
+
+/**
+ * A short trail of baby footprints — two pairs, alternating and slightly
+ * rotated, each print a sole plus three toes. For the Kicks screen's empty
+ * state, where "no sessions yet" can be an invitation instead of a blank.
+ */
+@Composable
+fun FootprintTrail(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        fun print(cx: Float, cy: Float, scale: Float, angle: Float, mirror: Float) {
+            rotate(angle, pivot = Offset(cx, cy)) {
+                drawOval(
+                    color = color,
+                    topLeft = Offset(cx - 0.055f * w * scale, cy - 0.085f * w * scale),
+                    size = androidx.compose.ui.geometry.Size(0.11f * w * scale, 0.17f * w * scale),
+                )
+                for (i in 0..2) {
+                    drawCircle(
+                        color = color,
+                        radius = 0.016f * w * scale,
+                        center = Offset(
+                            cx + mirror * (i - 1) * 0.038f * w * scale,
+                            cy - 0.115f * w * scale - (if (i == 1) 0.012f * w * scale else 0f),
+                        ),
+                    )
+                }
+            }
+        }
+        print(w * 0.22f, h * 0.72f, 1f, -14f, 1f)
+        print(w * 0.44f, h * 0.42f, 1f, -6f, -1f)
+        print(w * 0.66f, h * 0.66f, 0.92f, 8f, 1f)
+        print(w * 0.86f, h * 0.34f, 0.92f, 14f, -1f)
+    }
+}
