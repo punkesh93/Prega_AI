@@ -1,0 +1,6 @@
+{
+  "name": "Prega AI",
+  "description": "Intelligent, comforting pregnancy tracking, baby size milestones, daily checklist counters, kicks counters, and warm AI doctor-coaching companion.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
