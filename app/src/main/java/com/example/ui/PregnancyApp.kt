@@ -8,8 +8,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.Person
@@ -93,8 +93,8 @@ private enum class Tab(
     ),
     Coach(
         "Prega AI",
-        Icons.AutoMirrored.Outlined.Chat,
-        Icons.AutoMirrored.Filled.Chat,
+        Icons.Outlined.AutoAwesome,
+        Icons.Filled.AutoAwesome,
     ),
     You(
         "You",
