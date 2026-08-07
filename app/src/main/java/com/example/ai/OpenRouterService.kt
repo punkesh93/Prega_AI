@@ -206,3 +206,29 @@ object OpenRouterClient {
     /** Keeps token spend bounded on long coach conversations. */
     private const val MAX_HISTORY_TURNS = 12
 }
+
+/**
+ * Defensive markdown strip for display.
+ *
+ * The system prompt forbids markdown, but "forbids" is a request to a
+ * language model, not a guarantee — and a single literal ** on screen looks
+ * broken. This runs on every AI string at the point of receipt, so the UI
+ * never needs to know markdown existed. Conservative on purpose: it unwraps
+ * emphasis and headers and normalises bullets, and touches nothing else.
+ */
+fun String.stripMarkdown(): String {
+    var s = this
+    // **bold** / __bold__ -> bare
+    s = s.replace(Regex("""\*\*(.+?)\*\*"""), "$1")
+    s = s.replace(Regex("""__(.+?)__"""), "$1")
+    // *italic* / _italic_ (single, non-greedy, not part of a word like snake_case)
+    s = s.replace(Regex("""(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)"""), "$1")
+    s = s.replace(Regex("""(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)"""), "$1")
+    // `code`
+    s = s.replace(Regex("""`([^`]*)`"""), "$1")
+    // # Headers at line start -> plain line
+    s = s.replace(Regex("""(?m)^#{1,6}\s*"""), "")
+    // * or + bullets at line start -> "- "
+    s = s.replace(Regex("""(?m)^\s*[*+]\s+"""), "- ")
+    return s.trim()
+}

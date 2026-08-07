@@ -62,10 +62,14 @@ val Hairline           = Color(0xFFE7DFCF)  // borders, dividers
 // Same warmth philosophy as light: not near-black but a deep warm umber, like
 // a candlelit room rather than an OLED void. On-dark text is warm cream so
 // dark mode feels like the same calm app after sunset, not a different app.
-val InkDarkBg          = Color(0xFF211B14)
-val InkDarkSurface     = Color(0xFF2A231B)
-val InkDarkCard        = Color(0xFF342C22)
-val InkDarkHairline    = Color(0xFF443A2E)
+// Depth pass after feedback: the three layers were too close in value, so
+// dark mode read as one flat brown. Background deepened, cards lifted —
+// the same soft-charcoal layering logic the feedback asked for, kept warm
+// rather than navy so dark mode stays THIS app after sunset.
+val InkDarkBg          = Color(0xFF1D1810)
+val InkDarkSurface     = Color(0xFF292217)
+val InkDarkCard        = Color(0xFF3A3122)
+val InkDarkHairline    = Color(0xFF4E4232)
 val OnDark             = Color(0xFFF3ECDF)
 val OnDarkMuted        = Color(0xFFCFC5B2)  // brightened: was unreadably dim on umber
 

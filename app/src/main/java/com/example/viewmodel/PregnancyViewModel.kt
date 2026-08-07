@@ -10,6 +10,7 @@ import com.example.ai.AiResult
 import com.example.ai.OpenRouterClient
 import com.example.ai.PregaModel
 import com.example.ai.PregaPrompts
+import com.example.ai.stripMarkdown
 import com.example.data.*
 import com.example.domain.GamificationEngine
 import kotlinx.coroutines.Job
@@ -454,7 +455,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             )
 
             val reply = when (result) {
-                is AiResult.Success -> result.text
+                is AiResult.Success -> result.text.stripMarkdown()
                 is AiResult.NotConfigured -> OFFLINE_COACH_REPLY
                 is AiResult.Failure -> "I couldn't reach my notes just now — ${result.reason}" +
                     if (result.retryable) " Try asking again in a moment." else ""
@@ -509,7 +510,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             )
 
             _weeklyMealPlan.value = when (result) {
-                is AiResult.Success -> result.text
+                is AiResult.Success -> result.text.stripMarkdown()
                 is AiResult.NotConfigured -> null
                 is AiResult.Failure -> null
             }
@@ -563,7 +564,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 model = PregaModel.Quick,
                 temperature = 1.0,
                 maxTokens = 60,
-            ) ?: FALLBACK_AFFIRMATIONS[
+            )?.stripMarkdown() ?: FALLBACK_AFFIRMATIONS[
                 // Stable per-day pick, so it doesn't change on every recomposition.
                 (_todayDate.value.hashCode().let { if (it < 0) -it else it }) % FALLBACK_AFFIRMATIONS.size
             ]
@@ -589,7 +590,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 model = PregaModel.Quick,
                 temperature = 1.0,
                 maxTokens = 120,
-            )
+            )?.stripMarkdown()
         }
     }
 
@@ -1033,7 +1034,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             maxTokens = 250,
         )
 
-        val quests = generated?.let(::parseQuests)?.takeIf { it.size == 3 }
+        val quests = generated?.stripMarkdown()?.let(::parseQuests)?.takeIf { it.size == 3 }
             ?: FallbackQuests.POOL.shuffled().take(3).map { it.first to it.second }
 
         repository.saveQuests(

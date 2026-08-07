@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import com.example.MainActivity
 import com.example.R
 import com.example.ai.OpenRouterClient
+import com.example.ai.stripMarkdown
 import com.example.ai.PregaModel
 import com.example.ai.PregaPrompts
 import com.example.data.ALL_MIGRATIONS
@@ -94,7 +95,7 @@ class PregaNotificationWorker(
             else -> 3
         }
 
-        val raw = OpenRouterClient.completeOrNull(
+        val raw0 = OpenRouterClient.completeOrNull(
             systemPrompt = PregaPrompts.notification(
                 kind = kind,
                 week = week,
@@ -112,6 +113,7 @@ class PregaNotificationWorker(
             temperature = 1.0,
             maxTokens = 120,
         )
+        val raw = raw0?.stripMarkdown()
 
         return raw?.let(::parse) ?: fallbackFor(kind, week)
     }
