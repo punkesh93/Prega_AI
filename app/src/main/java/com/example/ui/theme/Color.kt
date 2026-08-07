@@ -54,8 +54,8 @@ val Linen              = Color(0xFFFAF8F1)  // app background — reference near
 val Shell              = Color(0xFFECF0DF)  // recessed surface — pale sage band, per reference
 val Card               = Color(0xFFFFFDF8)  // raised surface — cream-white
 val Ink                = Color(0xFF3A342A)  // primary text — warm olive-black
-val InkMuted           = Color(0xFF7C7263)  // secondary text
-val InkFaint           = Color(0xFFA79D8C)  // tertiary text / placeholders
+val InkMuted           = Color(0xFF635A49)  // secondary text — darkened after real-device "faded" feedback
+val InkFaint           = Color(0xFF8A8070)  // tertiary text — still quiet, now legible
 val Hairline           = Color(0xFFE7DFCF)  // borders, dividers
 
 // ─── Dark theme neutrals ───────────────────────────────────────────────────
@@ -67,7 +67,7 @@ val InkDarkSurface     = Color(0xFF2A231B)
 val InkDarkCard        = Color(0xFF342C22)
 val InkDarkHairline    = Color(0xFF443A2E)
 val OnDark             = Color(0xFFF3ECDF)
-val OnDarkMuted        = Color(0xFFBCB09D)
+val OnDarkMuted        = Color(0xFFCFC5B2)  // brightened: was unreadably dim on umber
 
 // ─── Semantic / status ─────────────────────────────────────────────────────
 val Success            = Color(0xFF5B9E6A)

@@ -345,7 +345,8 @@ private fun YouTab(
     themeMode: com.example.ui.theme.ThemeMode,
     onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
 ) {
-    var showBadges by rememberSaveable { mutableStateOf(true) }
+    // Garden first: the game is the tab's front door.
+    var section by rememberSaveable { mutableStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -354,11 +355,17 @@ private fun YouTab(
                 .padding(horizontal = Space.gutter, vertical = Space.md),
             horizontalArrangement = Arrangement.spacedBy(Space.sm),
         ) {
-            com.example.ui.components.PregaChip("Badges", showBadges, { showBadges = true })
-            com.example.ui.components.PregaChip("Settings", !showBadges, { showBadges = false })
+            com.example.ui.components.PregaChip("Garden", section == 0, { section = 0 })
+            com.example.ui.components.PregaChip("Badges", section == 1, { section = 1 })
+            com.example.ui.components.PregaChip("Settings", section == 2, { section = 2 })
         }
 
-        if (showBadges) {
+        if (section == 0) {
+            com.example.ui.garden.GardenScreen(
+                progress = progress,
+                badgeCount = badges.size,
+            )
+        } else if (section == 1) {
             BadgesScreen(earned = badges, progress = progress)
         } else {
             SettingsScreen(
