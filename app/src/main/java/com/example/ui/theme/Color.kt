@@ -15,6 +15,14 @@ import androidx.compose.ui.graphics.Color
 
 // ─── Core brand ────────────────────────────────────────────────────────────
 /** Primary. A soft, dusty rose — warm and human, never "hospital pink". */
+// ─── Reference scheme: olive green leads ───────────────────────────────────
+// The reference app's identity colour — the "ME" badge, play button, mood
+// ring — is a deep olive green. It is now THIS app's primary. Rose survives
+// only as a soft card pastel (blush blocks) and the heart accent, exactly
+// the role pink plays in the reference.
+val DeepOlive          = Color(0xFF66713A)  // primary — buttons, selection
+val DeepOliveDark      = Color(0xFF474F26)  // pressed / onContainer
+val OliveWhisper       = Color(0xFFE9EDDA)  // primaryContainer — pale sage band
 val BloomRose          = Color(0xFFD97A84)
 val BloomRoseDeep      = Color(0xFFB85A67)
 val BloomRoseSoft      = Color(0xFFF2C9CC)
@@ -42,8 +50,8 @@ val LavenderSoft       = Color(0xFFE6E1EF)
 // what makes the reference designs read as "calm" — colour sits ON warmth
 // rather than on clinical white. Ink shifts to a deep warm olive-brown to
 // match, so text feels inked rather than printed.
-val Linen              = Color(0xFFF7F2E9)  // app background — warm cream
-val Shell              = Color(0xFFEFE8DB)  // recessed surface
+val Linen              = Color(0xFFFAF8F1)  // app background — reference near-white cream
+val Shell              = Color(0xFFECF0DF)  // recessed surface — pale sage band, per reference
 val Card               = Color(0xFFFFFDF8)  // raised surface — cream-white
 val Ink                = Color(0xFF3A342A)  // primary text — warm olive-black
 val InkMuted           = Color(0xFF7C7263)  // secondary text

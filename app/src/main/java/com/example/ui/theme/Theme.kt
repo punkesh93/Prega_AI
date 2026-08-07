@@ -133,10 +133,10 @@ object PregaTheme {
 
 // ─── Material colour schemes ───────────────────────────────────────────────
 private val LightScheme = lightColorScheme(
-    primary = BloomRose,
+    primary = DeepOlive,
     onPrimary = Color.White,
-    primaryContainer = BloomRoseWhisper,
-    onPrimaryContainer = BloomRoseDeep,
+    primaryContainer = OliveWhisper,
+    onPrimaryContainer = DeepOliveDark,
     secondary = Sage,
     onSecondary = Color.White,
     secondaryContainer = SageSoft,
@@ -160,10 +160,10 @@ private val LightScheme = lightColorScheme(
 )
 
 private val DarkScheme = darkColorScheme(
-    primary = BloomRoseSoft,
-    onPrimary = Color(0xFF4A1F25),
-    primaryContainer = Color(0xFF5C2B32),
-    onPrimaryContainer = BloomRoseSoft,
+    primary = Color(0xFFB9C48D),
+    onPrimary = Color(0xFF2A2F14),
+    primaryContainer = Color(0xFF474F26),
+    onPrimaryContainer = Color(0xFFDDE4C4),
     secondary = Color(0xFFA8C4AC),
     onSecondary = Color(0xFF1F3324),
     secondaryContainer = Color(0xFF314736),
