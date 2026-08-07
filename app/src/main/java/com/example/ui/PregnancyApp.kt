@@ -141,6 +141,13 @@ fun PregnancyApp(
         return
     }
 
+    // First-launch tour: exactly once, on first arrival at the home screen.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showTour by remember {
+        mutableStateOf(!com.example.ui.tour.TourPreference.seen(context))
+    }
+
+    Box(Modifier.fillMaxSize()) {
     MainScaffold(
         viewModel = viewModel,
         profile = current,
@@ -153,6 +160,15 @@ fun PregnancyApp(
         themeMode = themeMode,
         onThemeModeChange = onThemeModeChange,
     )
+
+    com.example.ui.tour.WelcomeTour(
+        visible = showTour,
+        onDone = {
+            showTour = false
+            com.example.ui.tour.TourPreference.markSeen(context)
+        },
+    )
+    }
 }
 
 @Composable
