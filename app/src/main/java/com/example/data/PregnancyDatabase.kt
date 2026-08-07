@@ -71,6 +71,23 @@ data class KickLogEntity(
 @Dao
 interface PregnancyDao {
 
+    // ── Journal ───────────────────────────────────────────────────────────
+    @Insert
+    suspend fun insertJournalEntry(entry: JournalEntity): Long
+
+    @Query("SELECT * FROM journal_entries ORDER BY date DESC, id DESC")
+    fun getJournalEntries(): Flow<List<JournalEntity>>
+
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE date = :date")
+    suspend fun journalCountForDate(date: String): Int
+
+    @Query("DELETE FROM journal_entries WHERE id = :id")
+    suspend fun deleteJournalEntry(id: Long)
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun clearJournal()
+
+
     // Profile
     @Query("SELECT * FROM user_profile WHERE id = 1 LIMIT 1")
     fun getUserProfile(): Flow<UserProfileEntity?>
@@ -225,8 +242,9 @@ interface PregnancyDao {
         AppointmentEntity::class,
         ContractionEntity::class,
         WeightEntity::class,
+        JournalEntity::class,
     ],
-    version = 4,
+    version = 5,
     // Schemas are exported to app/schemas so migrations can be tested against
     // real historical schemas rather than written blind.
     exportSchema = true,

@@ -122,6 +122,7 @@ fun PregaButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     brush: Brush? = null,
+    fillWidth: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -137,7 +138,7 @@ fun PregaButton(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .heightIn(min = 56.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
@@ -164,6 +165,7 @@ fun PregaButton(
                 text = text,
                 style = MaterialTheme.typography.labelLarge,
                 color = if (active) Color.White else PregaTheme.colors.inkFaint,
+                modifier = Modifier.padding(horizontal = Space.xl),
             )
         }
     }

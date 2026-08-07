@@ -4,6 +4,13 @@ import kotlinx.coroutines.flow.Flow
 
 class PregnancyRepository(private val dao: PregnancyDao) {
 
+    // ── Journal ───────────────────────────────────────────────────────────
+    suspend fun addJournalEntry(entry: JournalEntity): Long = dao.insertJournalEntry(entry)
+    fun getJournalEntries() = dao.getJournalEntries()
+    suspend fun hasJournalEntryFor(date: String) = dao.journalCountForDate(date) > 0
+    suspend fun deleteJournalEntry(id: Long) = dao.deleteJournalEntry(id)
+
+
     // ── Profile ──────────────────────────────────────────────────────────
     fun getUserProfile(): Flow<UserProfileEntity?> = dao.getUserProfile()
     suspend fun saveUserProfile(profile: UserProfileEntity) = dao.insertUserProfile(profile)
@@ -64,6 +71,7 @@ class PregnancyRepository(private val dao: PregnancyDao) {
      * one place, so nothing is quietly left behind.
      */
     suspend fun deleteEverything() {
+        dao.clearJournal()
         dao.deleteUserProfile()
         dao.deleteAllDailyLogs()
         dao.deleteAllKickLogs()

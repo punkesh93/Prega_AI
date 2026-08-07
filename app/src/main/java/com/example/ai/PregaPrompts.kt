@@ -254,6 +254,29 @@ object PregaPrompts {
         """
     )
 
+    /**
+     * Journal caption: one warm line for a memory photo. Catchy but true —
+     * it may lift the mood of what she wrote, never contradict it, and it
+     * never promises outcomes (VOICE applies here as everywhere).
+     */
+    fun journalCaption(week: Int, trimester: Int, babyName: String, name: String) = prompt(
+        """
+        ROLE — Memory caption
+        She just saved a journal memory. Write its caption.
+
+        ${context(week, trimester, babyName, name)}
+
+        She may include her own note about the day; the caption should catch
+        its vibe. If her note is heavy, be gentle and steady — do not spin
+        hardship into forced positivity.
+
+        RULES
+        - One line, maximum 12 words. Warm, a little poetic, screenshot-worthy.
+        - Present tense. May mention week $week or $babyName when natural.
+        - No emoji, no quotes, no hashtags. Just the line.
+        """
+    )
+
     fun badgeCelebration(badgeName: String, week: Int) = prompt(
         """
         ROLE — Celebration

@@ -75,6 +75,8 @@ fun HomeScreen(
     state: HomeState,
     themeMode: ThemeMode = ThemeMode.System,
     onToggleTheme: () -> Unit = {},
+    onOpenJournal: () -> Unit = {},
+    checkedInToday: Boolean = true,
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
@@ -115,6 +117,10 @@ fun HomeScreen(
             )
         }
 
+        if (!checkedInToday) {
+            item { CheckInCard(onOpenJournal) }
+        }
+
         item { InsightCard(state.insight, onOpenCoach) }
 
         state.affirmation?.let {
@@ -142,6 +148,8 @@ fun HomeScreen(
                 onOpenCoach = onOpenCoach,
                 onOpenJourney = onOpenJourney,
                 onOpenAppointments = onOpenAppointments,
+                onOpenJournal = onOpenJournal,
+                onOpenGarden = onOpenAppointments, // You tab; garden is its front door
             )
         }
 
@@ -168,6 +176,8 @@ private fun ExploreGrid(
     onOpenCoach: () -> Unit,
     onOpenJourney: () -> Unit,
     onOpenAppointments: () -> Unit,
+    onOpenJournal: () -> Unit,
+    onOpenGarden: () -> Unit,
 ) {
     Column {
         SectionHeader(title = "Explore", overline = "Everything, one tap")
@@ -180,6 +190,11 @@ private fun ExploreGrid(
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
             ExploreCell("Your journey", PregaTheme.colors.terracottaSoft, onOpenJourney, Modifier.weight(1f))
             ExploreCell("Appointments", PregaTheme.colors.goldSoft, onOpenAppointments, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(Space.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+            ExploreCell("My journal", PregaTheme.colors.lavenderSoft, onOpenJournal, Modifier.weight(1f))
+            ExploreCell("My garden", PregaTheme.colors.sageSoft, onOpenGarden, Modifier.weight(1f))
         }
     }
 }
@@ -461,6 +476,37 @@ private fun WeekHero(
 private fun formatWeight(grams: Double): String =
     if (grams < 1000) "${grams.toInt()} g"
     else String.format("%.1f kg", grams / 1000)
+
+/**
+ * The once-a-day ask, and only once: mood, a line, maybe a photo. Appears
+ * only until she's checked in, then leaves the screen for the day — a
+ * standing card would become furniture she scrolls past.
+ */
+@Composable
+private fun CheckInCard(onOpenJournal: () -> Unit) {
+    PregaCard(
+        onClick = onOpenJournal,
+        containerColor = PregaTheme.colors.lavenderSoft,
+        border = false,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "How was today?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = PregaTheme.colors.ink,
+                )
+                Spacer(Modifier.height(Space.xxs))
+                Text(
+                    "A mood, a line, a photo if you like — thirty seconds, kept forever.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+            }
+            Text("→", color = PregaTheme.colors.inkFaint, fontSize = 18.sp)
+        }
+    }
+}
 
 @Composable
 private fun InsightCard(insight: String?, onOpenCoach: () -> Unit) {

@@ -530,6 +530,63 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     private val _dailyInsight = MutableStateFlow<String?>(null)
     val dailyInsight: StateFlow<String?> = _dailyInsight.asStateFlow()
 
+    // --- Journal ---
+    val journalEntries = repository.getJournalEntries()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _checkedInToday = MutableStateFlow(true) // assume yes until checked
+    val checkedInToday: StateFlow<Boolean> = _checkedInToday.asStateFlow()
+
+    fun refreshCheckInState() {
+        viewModelScope.launch {
+            _checkedInToday.value = repository.hasJournalEntryFor(_todayDate.value)
+        }
+    }
+
+    /**
+     * Saves a memory. If she wrote no caption of her own, one is generated —
+     * warm, matched to her note's vibe — with her note itself as the offline
+     * fallback so the entry is never blank.
+     */
+    fun saveJournalEntry(note: String, photoFile: String, mood: Int) {
+        viewModelScope.launch {
+            val p = profile.value ?: return@launch
+            val week = p.currentWeek
+
+            val caption = OpenRouterClient.completeOrNull(
+                systemPrompt = PregaPrompts.journalCaption(
+                    week = week,
+                    trimester = trimesterFor(week),
+                    babyName = p.babyNamePlaceholder,
+                    name = p.name,
+                ),
+                userPrompt = if (note.isBlank()) "No note today — caption the moment itself."
+                else "Her note: \"$note\"",
+                model = PregaModel.Quick,
+                temperature = 1.0,
+                maxTokens = 50,
+            )?.stripMarkdown() ?: note.ifBlank { "Week $week, held onto." }
+
+            repository.addJournalEntry(
+                JournalEntity(
+                    date = _todayDate.value,
+                    week = week,
+                    trimester = trimesterFor(week),
+                    photoFile = photoFile,
+                    note = note,
+                    caption = caption,
+                    mood = mood,
+                )
+            )
+            _checkedInToday.value = true
+            award(GamificationEngine.Action.JournalEntry, week, "Memory kept")
+        }
+    }
+
+    fun deleteJournalEntry(id: Long) {
+        viewModelScope.launch { repository.deleteJournalEntry(id) }
+    }
+
     // --- Daily affirmation ---
     private val _dailyAffirmation = MutableStateFlow<String?>(null)
     val dailyAffirmation: StateFlow<String?> = _dailyAffirmation.asStateFlow()

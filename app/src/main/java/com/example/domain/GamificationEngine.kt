@@ -267,6 +267,8 @@ class GamificationEngine(private val repository: PregnancyRepository) {
         CompleteQuest(Points.COMPLETE_QUEST),
         WeeklyMilestone(Points.WEEKLY_MILESTONE),
         LogAppointment(Points.APPOINTMENT_LOGGED),
+        /** A journal memory saved — same weight as a mood log. */
+        JournalEntry(Points.LOG_MOOD),
     }
 }
 

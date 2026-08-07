@@ -186,6 +186,7 @@ private fun MainScaffold(
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     var showPaywall by rememberSaveable { mutableStateOf(false) }
+    var showJournal by rememberSaveable { mutableStateOf(false) }
 
     val todayLog by viewModel.todayLog.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
@@ -200,6 +201,8 @@ private fun MainScaffold(
     val sessionKicks by viewModel.currentSessionKicks.collectAsStateWithLifecycle()
     val sessionSeconds by viewModel.currentSessionSeconds.collectAsStateWithLifecycle()
     val messages by viewModel.chatMessages.collectAsStateWithLifecycle()
+    val journalEntries by viewModel.journalEntries.collectAsStateWithLifecycle()
+    val checkedInToday by viewModel.checkedInToday.collectAsStateWithLifecycle()
     val chatLoading by viewModel.chatLoading.collectAsStateWithLifecycle()
 
     val weekInfo = remember(profile.currentWeek) { viewModel.getWeekInfo(profile.currentWeek) }
@@ -207,6 +210,8 @@ private fun MainScaffold(
     // ── Reward overlays ──
     var toast by remember { mutableStateOf<Pair<String, String>?>(null) }
     var revealBadge by remember { mutableStateOf<BadgeDef?>(null) }
+
+    LaunchedEffect(Unit) { viewModel.refreshCheckInState() }
 
     LaunchedEffect(Unit) {
         viewModel.rewards.collect { event ->
@@ -272,6 +277,11 @@ private fun MainScaffold(
                         onOpenCoach = { tab = Tab.Coach },
                         onOpenJourney = { tab = Tab.Journey },
                         onOpenAppointments = { tab = Tab.You },
+                        onOpenJournal = {
+                            viewModel.refreshCheckInState()
+                            showJournal = true
+                        },
+                        checkedInToday = checkedInToday,
                     )
 
                     Tab.Journey -> JourneyScreen(
@@ -331,6 +341,20 @@ private fun MainScaffold(
             celebration = null,
             onDismiss = { revealBadge = null },
         )
+
+        AnimatedVisibility(
+            visible = showJournal,
+            enter = Motion.riseIn(),
+            exit = Motion.riseOut(),
+        ) {
+            com.example.ui.journal.JournalScreen(
+                entries = journalEntries,
+                checkedInToday = checkedInToday,
+                onSave = viewModel::saveJournalEntry,
+                onDelete = viewModel::deleteJournalEntry,
+                onBack = { showJournal = false },
+            )
+        }
 
         AnimatedVisibility(
             visible = showPaywall,

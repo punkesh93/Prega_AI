@@ -241,3 +241,31 @@ data class WeightEntity(
     @PrimaryKey val date: String,
     val weightKg: Float,
 )
+
+/**
+ * Prega AI — journal entries.
+ *
+ * A memory: an optional photo (stored as a file in the app's private
+ * storage — the picked image is COPIED in, because photo-picker URIs are
+ * temporary grants that die with the process), her note, and a caption.
+ * The caption is AI-written when she leaves hers blank — warm, short,
+ * matched to the week — but her own words always win over generated ones.
+ *
+ * Like everything else: on-device only. Photos never leave the phone
+ * except when SHE shares an entry.
+ */
+@Entity(tableName = "journal_entries")
+data class JournalEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** yyyy-MM-dd */
+    val date: String,
+    val week: Int,
+    val trimester: Int,
+    /** Filename inside filesDir/journal/, empty when text-only. */
+    val photoFile: String = "",
+    /** Her own words. */
+    val note: String = "",
+    /** Shown caption — hers if she wrote one, else AI-generated. */
+    val caption: String = "",
+    val mood: Int = 0,
+)

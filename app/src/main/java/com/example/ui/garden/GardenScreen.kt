@@ -19,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import com.example.data.ProgressEntity
 import com.example.ui.components.PregaCard
@@ -89,6 +91,16 @@ fun GardenScreen(
                     .height(300.dp),
             )
         }
+
+        Spacer(Modifier.height(Space.md))
+
+        val shareContext = androidx.compose.ui.platform.LocalContext.current
+        PregaButton(
+            text = "Share my garden",
+            onClick = {
+                shareGarden(shareContext, flowers, butterflies, goldBlooms, progress.currentStreak)
+            },
+        )
 
         Spacer(Modifier.height(Space.md))
 
@@ -176,6 +188,19 @@ private fun GardenCanvas(
     val budGreen = Color(0xFFB2C084)
 
     Canvas(modifier) {
+        // Sky: a barely-there vertical wash so the scene has air, not a void.
+        drawRect(
+            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to Color(0x00FFFFFF),
+                1f to sageLight.copy(alpha = 0.35f),
+            ),
+        )
+        // Far mound: a third depth plane behind the two existing ones.
+        drawOval(
+            color = sageLight.copy(alpha = 0.55f),
+            topLeft = Offset(size.width * 0.28f, size.height * 0.55f),
+            size = androidx.compose.ui.geometry.Size(size.width * 0.9f, size.height * 0.5f),
+        )
         // Ground: two overlapping sage mounds.
         drawOval(
             color = sageLight,
@@ -238,17 +263,41 @@ private fun DrawScope.drawFlower(
         topLeft = Offset(x + h * 0.02f, baseY - h * 0.48f),
         size = androidx.compose.ui.geometry.Size(h * 0.18f, h * 0.09f),
     )
-    // Six petals + centre.
-    val r = h * 0.11f * breathe
-    for (p in 0 until 6) {
-        val a = p / 6f * 6.2832f
-        drawCircle(
-            color = petalColor,
-            radius = h * 0.075f * breathe,
-            center = Offset(topX + cos(a) * r, topY + sin(a) * r),
-        )
+    // Six oval petals, rotated outward, with a deeper under-tone first so
+    // each petal has depth — the difference between clipart and illustration.
+    val r = h * 0.10f * breathe
+    val deep = petalColor.copy(
+        red = petalColor.red * 0.82f,
+        green = petalColor.green * 0.82f,
+        blue = petalColor.blue * 0.82f,
+    )
+    for (layer in 0..1) {
+        val col = if (layer == 0) deep else petalColor
+        val spread = if (layer == 0) 1.12f else 1f
+        for (p in 0 until 6) {
+            val a = p / 6f * 6.2832f + (if (layer == 0) 0.26f else 0f)
+            val cxp = topX + cos(a) * r * spread
+            val cyp = topY + sin(a) * r * spread
+            rotate(
+                degrees = a * 57.2958f,
+                pivot = Offset(cxp, cyp),
+            ) {
+                drawOval(
+                    color = col,
+                    topLeft = Offset(cxp - h * 0.095f * breathe, cyp - h * 0.055f * breathe),
+                    size = androidx.compose.ui.geometry.Size(
+                        h * 0.19f * breathe, h * 0.11f * breathe,
+                    ),
+                )
+            }
+        }
     }
-    drawCircle(color = centre, radius = h * 0.05f, center = Offset(topX, topY))
+    drawCircle(color = centre, radius = h * 0.052f, center = Offset(topX, topY))
+    drawCircle(
+        color = centre.copy(alpha = 0.5f),
+        radius = h * 0.075f,
+        center = Offset(topX, topY),
+    )
 }
 
 private fun DrawScope.drawBud(x: Float, baseY: Float, h: Float, stem: Color, bud: Color) {
@@ -277,4 +326,112 @@ private fun DrawScope.drawButterfly(x: Float, y: Float, flap: Float) {
     drawOval(terra, topLeft = Offset(x - 7f - wx * 0.3f, y + 1f), size = androidx.compose.ui.geometry.Size(5f + wx * 0.7f, 6f))
     drawOval(terra, topLeft = Offset(x + 2f + wx * 0.3f, y + 1f), size = androidx.compose.ui.geometry.Size(5f + wx * 0.7f, 6f))
     drawLine(body, Offset(x, y - 7f), Offset(x, y + 8f), strokeWidth = 2.5f, cap = StrokeCap.Round)
+}
+
+// ─── Sharing ───────────────────────────────────────────────────────────────
+
+/**
+ * Renders her garden — the same drawing code as the live screen, one fixed
+ * frame — to a PNG and opens the share sheet. The image carries a small
+ * stamp line; her garden is the content, the app is the signature.
+ */
+private fun shareGarden(
+    context: android.content.Context,
+    flowers: Int,
+    butterflies: Int,
+    goldBlooms: Int,
+    streak: Int,
+) {
+    val w = 1080
+    val h = 810
+    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = androidx.compose.ui.graphics.Canvas(bitmap.asImageBitmap())
+
+    val blooms = run {
+        val rnd = Random(42)
+        List(18) { i ->
+            Bloom(
+                xFrac = 0.06f + (i % 9) * 0.105f + rnd.nextFloat() * 0.03f,
+                height = 0.22f + rnd.nextFloat() * 0.22f + if (i % 3 == 0) 0.08f else 0f,
+                baseInset = rnd.nextFloat() * 0.10f,
+                color = if (i < goldBlooms) 9 else i % 4,
+                phase = rnd.nextFloat() * 6.28f,
+            )
+        }
+    }
+
+    androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
+        density = androidx.compose.ui.unit.Density(2.5f),
+        layoutDirection = androidx.compose.ui.unit.LayoutDirection.Ltr,
+        canvas = canvas,
+        size = androidx.compose.ui.geometry.Size(w.toFloat(), h.toFloat()),
+    ) {
+        // Cream backdrop for a standalone image.
+        drawRect(Color(0xFFFAF8F1))
+        val sageLight = Color(0xFFE9EDDA)
+        val sageDeep = Color(0xFFD6E0C1)
+        val stem = Color(0xFF7A8A50)
+        val leaf = Color(0xFF8C9E60)
+        val petals = listOf(
+            Color(0xFFD87A84), Color(0xFFD9A441), Color(0xFFC5BADE), Color(0xFFE29478),
+        )
+        drawOval(
+            color = sageLight,
+            topLeft = Offset(-size.width * 0.2f, size.height * 0.62f),
+            size = androidx.compose.ui.geometry.Size(size.width * 1.4f, size.height * 0.8f),
+        )
+        drawOval(
+            color = sageDeep,
+            topLeft = Offset(-size.width * 0.3f, size.height * 0.78f),
+            size = androidx.compose.ui.geometry.Size(size.width * 1.6f, size.height * 0.9f),
+        )
+        blooms.forEachIndexed { i, b ->
+            val baseY = size.height * (0.86f - b.baseInset)
+            val x = size.width * b.xFrac
+            val hh = size.height * b.height
+            when {
+                i < flowers -> drawFlower(
+                    x, baseY, hh,
+                    sway = sin(b.phase) * 0.04f,
+                    petalColor = if (b.color == 9) Color(0xFFE3B23C) else petals[b.color],
+                    breathe = 1f,
+                    stem = stem, leaf = leaf, centre = Color(0xFFF7E6C4),
+                )
+                i == flowers -> drawBud(x, baseY, hh * 0.6f, stem, Color(0xFFB2C084))
+            }
+        }
+        repeat(butterflies) { b ->
+            drawButterfly(
+                size.width * (0.25f + b * 0.18f),
+                size.height * (0.20f + (b % 2) * 0.08f),
+                flap = 0.9f,
+            )
+        }
+    }
+
+    val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+    val file = java.io.File(dir, "my_garden.png")
+    java.io.FileOutputStream(file).use {
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+    }
+
+    val uri = androidx.core.content.FileProvider.getUriForFile(
+        context, "${context.packageName}.share", file,
+    )
+    val text = buildString {
+        append("My self-care garden — $flowers flowers and counting 🌸\n")
+        if (streak > 0) append("$streak-day streak\n")
+        append("\nGrown with Prega AI")
+    }
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(
+            android.content.Intent.createChooser(intent, "Share your garden")
+        )
+    }
 }

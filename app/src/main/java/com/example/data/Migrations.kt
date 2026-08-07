@@ -157,5 +157,25 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Journal entries — additive only; nothing existing is touched.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                date TEXT NOT NULL,
+                week INTEGER NOT NULL,
+                trimester INTEGER NOT NULL,
+                photoFile TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                caption TEXT NOT NULL DEFAULT '',
+                mood INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 /** Every migration the app knows about. Pass to `addMigrations(*ALL_MIGRATIONS)`. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4, MIGRATION_4_5)

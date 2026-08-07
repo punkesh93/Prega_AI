@@ -1,5 +1,6 @@
 package com.example.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -242,6 +243,53 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(Space.lg))
             PregaTextButton("Export my data", onExportData)
+        }
+
+        Spacer(Modifier.height(Space.lg))
+
+        // ── Privacy policy ──
+        // Play requires a stated policy for apps handling health data; more
+        // to the point, she deserves one she can actually read. Plain words,
+        // shown in-app so it's true offline too.
+        var showPolicy by remember { mutableStateOf(false) }
+        PregaCard(onClick = { showPolicy = !showPolicy }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Privacy policy",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                    Text(
+                        "The short version: your data stays on this phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                }
+                Text(if (showPolicy) "−" else "+", color = PregaTheme.colors.inkFaint, fontSize = 22.sp)
+            }
+            AnimatedVisibility(visible = showPolicy) {
+                Column {
+                    Spacer(Modifier.height(Space.md))
+                    Text(
+                        """
+                        What we store: everything you enter — your profile, daily logs, kick sessions, moods, appointments, journal notes and photos — lives only in this app's private storage on this phone. There is no account and no server holding your data.
+
+                        What leaves the phone: only your questions to Prega AI (and basic context like your week) are sent to our AI provider to generate an answer. They are not used to identify you and are not sold. Journal photos are never uploaded.
+
+                        Sharing: nothing is ever shared unless you tap share yourself.
+
+                        Payments: subscriptions are handled entirely by Google Play. We never see your payment details.
+
+                        Deleting: "Delete everything" below removes all of it, immediately and permanently. Uninstalling the app does the same.
+
+                        Not medical care: Prega AI offers general information and never replaces your midwife or doctor.
+                        """.trimIndent(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(Space.lg))
