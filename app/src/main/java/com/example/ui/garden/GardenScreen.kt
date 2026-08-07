@@ -410,6 +410,37 @@ private fun shareGarden(
         }
     }
 
+    // Title + stamp drawn INTO the image, so the share stands alone on any
+    // feed without its accompanying text: serif title top, quiet footer band.
+    run {
+        val g = android.graphics.Canvas(bitmap)
+        val ink = android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(58, 52, 42)
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.create(
+                android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD
+            )
+            textSize = 64f
+        }
+        g.drawText("My Bloom Garden", 48f, 96f, ink)
+        val sub = android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(99, 90, 73)
+            isAntiAlias = true
+            textSize = 34f
+        }
+        val subtitle = buildString {
+            append("$flowers flower${if (flowers == 1) "" else "s"}")
+            if (streak > 0) append("  ·  $streak-day streak")
+        }
+        g.drawText(subtitle, 50f, 150f, sub)
+        val foot = android.graphics.Paint().apply {
+            color = android.graphics.Color.argb(180, 99, 90, 73)
+            isAntiAlias = true
+            textSize = 30f
+        }
+        g.drawText("Grown with Prega AI", 48f, h - 36f, foot)
+    }
+
     val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
     val file = java.io.File(dir, "my_garden.png")
     java.io.FileOutputStream(file).use {

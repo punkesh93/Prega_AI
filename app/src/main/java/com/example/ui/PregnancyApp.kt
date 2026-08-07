@@ -187,6 +187,7 @@ private fun MainScaffold(
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     var showPaywall by rememberSaveable { mutableStateOf(false) }
     var showJournal by rememberSaveable { mutableStateOf(false) }
+    var showAppointments by rememberSaveable { mutableStateOf(false) }
 
     val todayLog by viewModel.todayLog.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
@@ -202,6 +203,9 @@ private fun MainScaffold(
     val sessionSeconds by viewModel.currentSessionSeconds.collectAsStateWithLifecycle()
     val messages by viewModel.chatMessages.collectAsStateWithLifecycle()
     val journalEntries by viewModel.journalEntries.collectAsStateWithLifecycle()
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDarkResolved = themeMode == com.example.ui.theme.ThemeMode.Dark ||
+        (themeMode == com.example.ui.theme.ThemeMode.System && systemDark)
     val checkedInToday by viewModel.checkedInToday.collectAsStateWithLifecycle()
     val chatLoading by viewModel.chatLoading.collectAsStateWithLifecycle()
 
@@ -247,13 +251,14 @@ private fun MainScaffold(
             ) { selected ->
                 when (selected) {
                     Tab.Today -> HomeScreen(
-                        themeMode = themeMode,
-                        // Home toggle flips Light <-> Dark directly; "System"
-                        // remains available in Settings for those who want it.
+                        // Resolve System to what she actually SEES right now,
+                        // then toggle from that. The old check compared the
+                        // mode enum, so in System-mode-while-dark the button
+                        // set Dark — no visible change, "doesn't work".
+                        isDark = isDarkResolved,
                         onToggleTheme = {
                             onThemeModeChange(
-                                if (themeMode == com.example.ui.theme.ThemeMode.Dark)
-                                    com.example.ui.theme.ThemeMode.Light
+                                if (isDarkResolved) com.example.ui.theme.ThemeMode.Light
                                 else com.example.ui.theme.ThemeMode.Dark
                             )
                         },
@@ -276,7 +281,9 @@ private fun MainScaffold(
                         onOpenKicks = { tab = Tab.Kicks },
                         onOpenCoach = { tab = Tab.Coach },
                         onOpenJourney = { tab = Tab.Journey },
-                        onOpenAppointments = { tab = Tab.You },
+                        onOpenAppointments = { showAppointments = true },
+                        onOpenGarden = { tab = Tab.You },
+                        onStepsGoal = viewModel::onStepsGoalReached,
                         onOpenJournal = {
                             viewModel.refreshCheckInState()
                             showJournal = true
@@ -341,6 +348,22 @@ private fun MainScaffold(
             celebration = null,
             onDismiss = { revealBadge = null },
         )
+
+        AnimatedVisibility(
+            visible = showAppointments,
+            enter = Motion.riseIn(),
+            exit = Motion.riseOut(),
+        ) {
+            val appts by viewModel.appointments.collectAsStateWithLifecycle()
+            val today by viewModel.todayDate.collectAsStateWithLifecycle()
+            com.example.ui.appointments.AppointmentsScreen(
+                appointments = appts,
+                todayDate = today,
+                onSave = viewModel::saveAppointment,
+                onDelete = viewModel::deleteAppointment,
+                onBack = { showAppointments = false },
+            )
+        }
 
         AnimatedVisibility(
             visible = showJournal,

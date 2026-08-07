@@ -67,6 +67,49 @@ fun JourneyScreen(
             RingHeader(currentWeek)
         }
 
+        // What the tab is FOR, answered before the long scroll: where she is
+        // now in plain words, and a glance at what the next two weeks bring —
+        // pregnancy lives in the near future as much as the present.
+        item(key = "now_and_next") {
+            val now = weekInfoFor(currentWeek)
+            Column {
+                PregaCard(
+                    containerColor = PregaTheme.colors.terracottaSoft,
+                    border = false,
+                ) {
+                    Overline("Right now — week $currentWeek")
+                    Spacer(Modifier.height(Space.xs))
+                    Text(
+                        now.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                }
+                if (currentWeek < 39) {
+                    Spacer(Modifier.height(Space.md))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                        (currentWeek + 1..(currentWeek + 2).coerceAtMost(40)).forEach { w ->
+                            val info = weekInfoFor(w)
+                            PregaCard(
+                                containerColor = PregaTheme.colors.sageSoft,
+                                border = false,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Overline("Week $w")
+                                Spacer(Modifier.height(Space.xxs))
+                                Text(
+                                    "${info.iconEmoji} ${info.sizeName}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PregaTheme.colors.ink,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Space.lg))
+            }
+        }
+
         items(weeks, key = { it }) { week ->
             WeekRow(
                 info = weekInfoFor(week),

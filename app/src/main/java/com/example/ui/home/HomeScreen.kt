@@ -35,7 +35,6 @@ import com.example.ui.components.*
 import com.example.ui.theme.Motion
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
-import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.trimesterColor
 import com.example.viewmodel.WeekInfo
 
@@ -73,9 +72,11 @@ data class HomeState(
 @Composable
 fun HomeScreen(
     state: HomeState,
-    themeMode: ThemeMode = ThemeMode.System,
+    isDark: Boolean = false,
     onToggleTheme: () -> Unit = {},
     onOpenJournal: () -> Unit = {},
+    onOpenGarden: () -> Unit = {},
+    onStepsGoal: () -> Unit = {},
     checkedInToday: Boolean = true,
     onWater: () -> Unit,
     onVitamins: () -> Unit,
@@ -103,7 +104,7 @@ fun HomeScreen(
             HomeHeader(
                 name = state.profile?.name.orEmpty(),
                 state = state,
-                themeMode = themeMode,
+                isDark = isDark,
                 onToggleTheme = onToggleTheme,
             )
         }
@@ -139,6 +140,7 @@ fun HomeScreen(
                 onWater = onWater,
                 onVitamins = onVitamins,
                 onMood = onMood,
+                onStepsGoal = onStepsGoal,
             )
         }
 
@@ -149,7 +151,7 @@ fun HomeScreen(
                 onOpenJourney = onOpenJourney,
                 onOpenAppointments = onOpenAppointments,
                 onOpenJournal = onOpenJournal,
-                onOpenGarden = onOpenAppointments, // You tab; garden is its front door
+                onOpenGarden = onOpenGarden,
             )
         }
 
@@ -247,7 +249,7 @@ private fun ExploreCell(
 private fun HomeHeader(
     name: String,
     state: HomeState,
-    themeMode: ThemeMode,
+    isDark: Boolean,
     onToggleTheme: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -258,18 +260,33 @@ private fun HomeHeader(
             .padding(top = Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            greetingFor(name),
-            style = MaterialTheme.typography.headlineLarge,
-            color = PregaTheme.colors.ink,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                greetingFor(name),
+                style = MaterialTheme.typography.headlineLarge,
+                color = PregaTheme.colors.ink,
+            )
+            if (state.progress.currentStreak > 0 || state.progress.points > 0) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    buildString {
+                        if (state.progress.currentStreak > 0)
+                            append("\uD83C\uDF31 ${state.progress.currentStreak}-day streak")
+                        if (state.progress.currentStreak > 0 && state.progress.points > 0)
+                            append("  ·  ")
+                        if (state.progress.points > 0)
+                            append("${state.progress.points} bloom points")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.sage,
+                )
+            }
+        }
 
         // Day/night, one tap from the home screen. The icon shows what
         // tapping GIVES her (moon = "switch to dark"), not the current state.
         HeaderIcon(
-            icon = if (themeMode == ThemeMode.Dark) Icons.Outlined.LightMode
-            else Icons.Outlined.DarkMode,
+            icon = if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
             contentDescription = "Switch theme",
             onClick = onToggleTheme,
         )
@@ -763,6 +780,7 @@ private fun QuickLog(
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
+    onStepsGoal: () -> Unit,
 ) {
     Column {
         SectionHeader(title = "Quick log", overline = "One tap each")
@@ -779,6 +797,10 @@ private fun QuickLog(
             VitaminsTile(
                 taken = log?.tookVitamins == true,
                 onTap = onVitamins,
+                modifier = Modifier.weight(1f),
+            )
+            StepsTile(
+                onGoalReached = onStepsGoal,
                 modifier = Modifier.weight(1f),
             )
         }

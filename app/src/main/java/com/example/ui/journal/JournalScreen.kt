@@ -7,9 +7,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -71,7 +76,8 @@ fun JournalScreen(
         modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .systemBarsPadding(),
+            .systemBarsPadding()
+            .imePadding(),
     ) {
         Row(
             Modifier
@@ -97,17 +103,22 @@ fun JournalScreen(
             }
         }
 
-        AnimatedVisibility(visible = composing, enter = Motion.popIn, exit = Motion.popOut) {
-            Composer(
-                onSave = { note, photo, mood ->
-                    onSave(note, photo, mood)
-                    composing = false
-                },
-                onCancel = { composing = false },
-            )
-        }
-
-        if (entries.isEmpty() && !composing) {
+        if (composing) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Composer(
+                    onSave = { note, photo, mood ->
+                        onSave(note, photo, mood)
+                        composing = false
+                    },
+                    onCancel = { composing = false },
+                )
+                Spacer(Modifier.height(Space.xl))
+            }
+        } else if (entries.isEmpty()) {
             EmptyJournal(onStart = { composing = true })
         } else {
             Timeline(entries, onDelete, onShare = { shareEntry(context, it) })
@@ -248,7 +259,9 @@ private fun Timeline(
                 Spacer(Modifier.height(Space.xs))
             }
             items(group, key = { it.id }) { entry ->
-                EntryCard(entry, onDelete, onShare)
+                Box(Modifier.animateItem()) {
+                    EntryCard(entry, onDelete, onShare)
+                }
             }
         }
     }
@@ -278,13 +291,19 @@ private fun EntryCard(
     PregaCard(contentPadding = PaddingValues(0.dp)) {
         Column {
             bitmap?.let {
+                val photoAlpha by animateFloatAsState(
+                    targetValue = 1f,
+                    animationSpec = tween(450),
+                    label = "photoFade",
+                )
                 androidx.compose.foundation.Image(
                     bitmap = it.asImageBitmap(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(210.dp),
+                        .height(210.dp)
+                        .graphicsLayer { alpha = photoAlpha },
                 )
             }
             Column(Modifier.padding(Space.lg)) {

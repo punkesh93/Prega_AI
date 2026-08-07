@@ -1018,6 +1018,12 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
      * the UI should celebrate. Every tracked interaction funnels through here so
      * points, streaks and badges can never drift out of sync.
      */
+    /** Steps goal reached (once per day, guarded on the tile side). */
+    fun onStepsGoalReached() {
+        val week = profile.value?.currentWeek ?: return
+        award(GamificationEngine.Action.StepsGoal, week, "A gentle walk done")
+    }
+
     private fun award(
         action: GamificationEngine.Action,
         week: Int,

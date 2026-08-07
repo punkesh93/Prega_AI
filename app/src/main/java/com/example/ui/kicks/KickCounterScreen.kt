@@ -1,6 +1,7 @@
 package com.example.ui.kicks
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -97,6 +98,8 @@ fun KickCounterScreen(
     }
 }
 
+private val PregaColorRipple = androidx.compose.ui.graphics.Color(0xFF8FA063)
+
 // ─── Active session ────────────────────────────────────────────────────────
 
 @Composable
@@ -138,6 +141,35 @@ private fun ActiveSession(
         Spacer(Modifier.height(Space.xl))
 
         Box(contentAlignment = Alignment.Center) {
+            // A soft ring expands outward from the button on every kick —
+            // the moment reads as a pulse of life, not a counter click.
+            val ripple = remember { androidx.compose.animation.core.Animatable(0f) }
+            LaunchedEffect(kicks) {
+                if (kicks > 0) {
+                    ripple.snapTo(0f)
+                    ripple.animateTo(1f, animationSpec = tween(650))
+                }
+            }
+            if (ripple.value > 0f && ripple.value < 1f) {
+                androidx.compose.foundation.Canvas(Modifier.size(320.dp)) {
+                    drawCircle(
+                        color = PregaColorRipple.copy(alpha = (1f - ripple.value) * 0.45f),
+                        radius = size.minDimension / 2f * (0.75f + 0.25f * ripple.value),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 10f * (1f - ripple.value) + 2f,
+                        ),
+                    )
+                }
+            }
+
+            // Session progress: ten felt kicks is the classic count-to target;
+            // the ring quietly fills so she can feel progress without reading.
+            ProgressRing(
+                progress = (kicks / 10f).coerceAtMost(1f),
+                size = 268.dp,
+                strokeWidth = 6.dp,
+            )
+
             Breathing(minScale = 0.99f, maxScale = 1.01f) {
                 Box(
                     Modifier

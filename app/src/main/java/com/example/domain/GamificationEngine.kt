@@ -269,6 +269,8 @@ class GamificationEngine(private val repository: PregnancyRepository) {
         LogAppointment(Points.APPOINTMENT_LOGGED),
         /** A journal memory saved — same weight as a mood log. */
         JournalEntry(Points.LOG_MOOD),
+        /** Daily gentle-walk goal — weighted like a kick session. */
+        StepsGoal(Points.KICK_SESSION),
     }
 }
 
