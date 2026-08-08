@@ -148,33 +148,6 @@ fun PregnancyApp(
         mutableStateOf(!com.example.ui.tour.TourPreference.seen(context))
     }
 
-    val drawerState = androidx.compose.material3.rememberDrawerState(
-        androidx.compose.material3.DrawerValue.Closed
-    )
-    val drawerScope = rememberCoroutineScope()
-
-    androidx.compose.material3.ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            AppDrawer(
-                name = current.name,
-                week = current.currentWeek,
-                onGo = { destination ->
-                    drawerScope.launch { drawerState.close() }
-                    when (destination) {
-                        "journal" -> showTourSafeJournal(viewModel) { showJournal = true }
-                        "garden" -> tab = Tab.You
-                        "appointments" -> showAppointments = true
-                        "badges" -> tab = Tab.You
-                        "settings" -> tab = Tab.You
-                        "premium" -> showPaywall = true
-                        "kicks" -> tab = Tab.Kicks
-                        "coach" -> tab = Tab.PregaAI
-                    }
-                },
-            )
-        },
-    ) {
     Box(Modifier.fillMaxSize()) {
     MainScaffold(
         viewModel = viewModel,
@@ -197,17 +170,8 @@ fun PregnancyApp(
         },
     )
     }
-    }
 }
 
-/** Small indirection so the drawer can refresh check-in state before opening. */
-private fun showTourSafeJournal(
-    viewModel: com.example.viewmodel.PregnancyViewModel,
-    open: () -> Unit,
-) {
-    viewModel.refreshCheckInState()
-    open()
-}
 
 /**
  * The slide-out quick menu: her profile at the top, then every destination
@@ -301,6 +265,14 @@ private fun MainScaffold(
     var showJournal by rememberSaveable { mutableStateOf(false) }
     var showAppointments by rememberSaveable { mutableStateOf(false) }
 
+    // Slide-out quick menu. Declared HERE — beside the tab/overlay state it
+    // drives — after a scope bug: the first draft placed the drawer a level
+    // up in PregnancyApp, where none of these symbols exist.
+    val drawerState = androidx.compose.material3.rememberDrawerState(
+        androidx.compose.material3.DrawerValue.Closed
+    )
+    val drawerScope = rememberCoroutineScope()
+
     val todayLog by viewModel.todayLog.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val quests by viewModel.todayQuests.collectAsStateWithLifecycle()
@@ -364,6 +336,28 @@ private fun MainScaffold(
         }
     }
 
+    androidx.compose.material3.ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                name = profile.name,
+                week = profile.currentWeek,
+                onGo = { destination ->
+                    drawerScope.launch { drawerState.close() }
+                    when (destination) {
+                        "journal" -> { viewModel.refreshCheckInState(); showJournal = true }
+                        "garden" -> tab = Tab.You
+                        "appointments" -> showAppointments = true
+                        "badges" -> tab = Tab.You
+                        "settings" -> tab = Tab.You
+                        "premium" -> showPaywall = true
+                        "kicks" -> tab = Tab.Kicks
+                        "coach" -> tab = Tab.Coach
+                    }
+                },
+            )
+        },
+    ) {
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -519,6 +513,7 @@ private fun MainScaffold(
                 onDismiss = { showPaywall = false },
             )
         }
+    }
     }
 }
 
