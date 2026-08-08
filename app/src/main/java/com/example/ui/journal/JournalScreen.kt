@@ -186,6 +186,33 @@ private fun Composer(
         )
 
         Spacer(Modifier.height(Space.md))
+
+        // Photo: the picker button, and — the missing piece from device
+        // testing — an actual PREVIEW once one is chosen, so she can SEE the
+        // photo attached rather than trusting a text label.
+        if (photoFile.isNotBlank()) {
+            val preview by produceState<android.graphics.Bitmap?>(null, photoFile) {
+                value = withContext(Dispatchers.IO) {
+                    runCatching {
+                        android.graphics.BitmapFactory.decodeFile(
+                            File(File(context.filesDir, "journal"), photoFile).absolutePath
+                        )
+                    }.getOrNull()
+                }
+            }
+            preview?.let {
+                androidx.compose.foundation.Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Today's photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(170.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                )
+                Spacer(Modifier.height(Space.sm))
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
@@ -211,21 +238,22 @@ private fun Composer(
             Spacer(Modifier.width(Space.md))
             Text(
                 if (photoFile.isBlank()) "Add a photo of today (optional)"
-                else "Photo attached",
+                else "Tap to choose a different photo",
                 style = MaterialTheme.typography.bodySmall,
                 color = PregaTheme.colors.inkMuted,
             )
         }
 
         Spacer(Modifier.height(Space.lg))
-        Row {
+        // Stacked, not side-by-side: the save action is the hero and can
+        // never again be squeezed out of a Row.
+        PregaButton(
+            text = "Keep this day",
+            onClick = { onSave(note.trim(), photoFile, mood) },
+        )
+        Spacer(Modifier.height(Space.sm))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             PregaTextButton("Not today", onCancel)
-            Spacer(Modifier.weight(1f))
-            PregaButton(
-                text = "Keep this day",
-                onClick = { onSave(note.trim(), photoFile, mood) },
-                fillWidth = false,
-            )
         }
         Spacer(Modifier.height(Space.xs))
         Text(

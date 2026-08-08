@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.LocalFlorist
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.*
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -147,6 +148,33 @@ fun PregnancyApp(
         mutableStateOf(!com.example.ui.tour.TourPreference.seen(context))
     }
 
+    val drawerState = androidx.compose.material3.rememberDrawerState(
+        androidx.compose.material3.DrawerValue.Closed
+    )
+    val drawerScope = rememberCoroutineScope()
+
+    androidx.compose.material3.ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                name = current.name,
+                week = current.currentWeek,
+                onGo = { destination ->
+                    drawerScope.launch { drawerState.close() }
+                    when (destination) {
+                        "journal" -> showTourSafeJournal(viewModel) { showJournal = true }
+                        "garden" -> tab = Tab.You
+                        "appointments" -> showAppointments = true
+                        "badges" -> tab = Tab.You
+                        "settings" -> tab = Tab.You
+                        "premium" -> showPaywall = true
+                        "kicks" -> tab = Tab.Kicks
+                        "coach" -> tab = Tab.PregaAI
+                    }
+                },
+            )
+        },
+    ) {
     Box(Modifier.fillMaxSize()) {
     MainScaffold(
         viewModel = viewModel,
@@ -168,6 +196,90 @@ fun PregnancyApp(
             com.example.ui.tour.TourPreference.markSeen(context)
         },
     )
+    }
+    }
+}
+
+/** Small indirection so the drawer can refresh check-in state before opening. */
+private fun showTourSafeJournal(
+    viewModel: com.example.viewmodel.PregnancyViewModel,
+    open: () -> Unit,
+) {
+    viewModel.refreshCheckInState()
+    open()
+}
+
+/**
+ * The slide-out quick menu: her profile at the top, then every destination
+ * one tap away — asked for directly ("explore is at the bottom; give me a
+ * slide with all quick menus and profile"). Reached from the avatar chip in
+ * the home header or an edge swipe.
+ */
+@androidx.compose.runtime.Composable
+private fun AppDrawer(
+    name: String,
+    week: Int,
+    onGo: (String) -> Unit,
+) {
+    androidx.compose.material3.ModalDrawerSheet(
+        drawerContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+    ) {
+        Column(Modifier.padding(Space.gutter)) {
+            Spacer(Modifier.height(Space.xl))
+            Box(
+                Modifier
+                    .size(64.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(PregaTheme.colors.sageSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    name.take(1).uppercase().ifBlank { "P" },
+                    style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
+                    color = PregaTheme.colors.sage,
+                )
+            }
+            Spacer(Modifier.height(Space.md))
+            Text(
+                name.ifBlank { "You" },
+                style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
+                color = PregaTheme.colors.ink,
+            )
+            Text(
+                "Week $week",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = PregaTheme.colors.inkMuted,
+            )
+            Spacer(Modifier.height(Space.xl))
+
+            listOf(
+                Triple("journal", "My journal", "📔"),
+                Triple("garden", "My garden", "🌷"),
+                Triple("appointments", "Appointments", "🗓️"),
+                Triple("kicks", "Kick counter", "👣"),
+                Triple("coach", "Ask Prega AI", "✨"),
+                Triple("badges", "Badges", "🏅"),
+                Triple("premium", "Premium", "🌸"),
+                Triple("settings", "Settings", "⚙️"),
+            ).forEach { (id, label, emoji) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(androidx.compose.material3.MaterialTheme.shapes.medium)
+                        .clickable { onGo(id) }
+                        .padding(vertical = Space.md, horizontal = Space.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(emoji, fontSize = 20.sp)
+                    Spacer(Modifier.width(Space.md))
+                    Text(
+                        label,
+                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -214,6 +326,20 @@ private fun MainScaffold(
     // ── Reward overlays ──
     var toast by remember { mutableStateOf<Pair<String, String>?>(null) }
     var revealBadge by remember { mutableStateOf<BadgeDef?>(null) }
+
+    // The system back gesture was closing the whole app from anywhere.
+    // Back now means "one step out": overlay -> close it; non-home tab ->
+    // home; home -> the system exits as normal.
+    androidx.activity.compose.BackHandler(
+        enabled = showJournal || showAppointments || showPaywall || tab != Tab.Today,
+    ) {
+        when {
+            showJournal -> showJournal = false
+            showAppointments -> showAppointments = false
+            showPaywall -> showPaywall = false
+            tab != Tab.Today -> tab = Tab.Today
+        }
+    }
 
     LaunchedEffect(Unit) { viewModel.refreshCheckInState() }
 
@@ -284,6 +410,7 @@ private fun MainScaffold(
                         onOpenAppointments = { showAppointments = true },
                         onOpenGarden = { tab = Tab.You },
                         onStepsGoal = viewModel::onStepsGoalReached,
+                        onOpenMenu = { drawerScope.launch { drawerState.open() } },
                         onOpenJournal = {
                             viewModel.refreshCheckInState()
                             showJournal = true

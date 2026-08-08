@@ -213,7 +213,7 @@ private fun ActiveSession(
         Spacer(Modifier.height(Space.xl))
         PregaButton("Finish session", onStop, enabled = kicks > 0)
         Spacer(Modifier.height(Space.sm))
-        PregaTextButton("Discard", onCancel)
+        PregaTextButton("Discard", onCancel, fillWidth = true)
     }
 }
 

@@ -178,18 +178,25 @@ fun PregaTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    // Wrap-content by default. The old unconditional fillMaxWidth() made a
+    // TEXT button behave like a banner: inside any Row it swallowed the full
+    // width and crushed its siblings to zero — which is precisely how the
+    // journal's save button "disappeared" and appointment titles vanished on
+    // a real device. A text button is a word, not a slab.
+    fillWidth: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(percent = 50))
             .border(1.5.dp, PregaTheme.colors.hairline, RoundedCornerShape(percent = 50))
             .clickableNoRipple(interaction, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
+            modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.xs),
             text = text,
             style = MaterialTheme.typography.labelLarge,
             color = if (enabled) PregaTheme.colors.inkMuted else PregaTheme.colors.inkFaint,

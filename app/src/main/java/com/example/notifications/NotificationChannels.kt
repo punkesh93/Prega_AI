@@ -21,16 +21,16 @@ import androidx.core.content.getSystemService
 object NotificationChannels {
 
     /** Week changes, trimester milestones. Low volume, high value. */
-    const val MILESTONES = "prega_milestones"
+    const val MILESTONES = "prega_milestones_v2"
 
     /** Appointment reminders. The most functionally important channel. */
-    const val APPOINTMENTS = "prega_appointments"
+    const val APPOINTMENTS = "prega_appointments_v2"
 
     /** Daily check-in, quests, encouragement. The chattiest channel. */
-    const val DAILY = "prega_daily"
+    const val DAILY = "prega_daily_v2"
 
     /** Hydration, kick counting, rest. Opt-out friendly. */
-    const val NUDGES = "prega_nudges"
+    const val NUDGES = "prega_nudges_v2"
 
     fun registerAll(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -49,17 +49,25 @@ object NotificationChannels {
                 "Reminders for scans, checks and midwife visits",
                 NotificationManager.IMPORTANCE_HIGH,
             ),
+            // Both of these were IMPORTANCE_LOW — deliberately silent — and
+            // real-device feedback was that "notifications have no sound",
+            // i.e. silence read as broken, not considerate. DEFAULT gives the
+            // system sound; quiet hours still gate WHEN anything fires, and
+            // she can silence any channel in system settings. IDs are bumped
+            // to _v2 because Android never updates an existing channel's
+            // importance — without new IDs, existing installs would stay
+            // silent forever.
             Channel(
                 DAILY,
                 "Daily check-in",
                 "Your daily quests and a gentle morning open",
-                NotificationManager.IMPORTANCE_LOW,
+                NotificationManager.IMPORTANCE_DEFAULT,
             ),
             Channel(
                 NUDGES,
                 "Gentle nudges",
                 "Water, rest and kick-counting reminders",
-                NotificationManager.IMPORTANCE_LOW,
+                NotificationManager.IMPORTANCE_DEFAULT,
             ),
         ).forEach { manager.createNotificationChannel(it.build()) }
     }

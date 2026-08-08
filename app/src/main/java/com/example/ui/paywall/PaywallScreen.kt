@@ -183,7 +183,7 @@ fun PaywallScreen(
                             enabled = price != null,
                         )
                         Spacer(Modifier.height(Space.sm))
-                        PregaTextButton("Maybe later", onDismiss)
+                        PregaTextButton("Maybe later", onDismiss, fillWidth = true)
                         Spacer(Modifier.height(Space.md))
                         Text(
                             "Billed through Google Play. Renews monthly until cancelled.",

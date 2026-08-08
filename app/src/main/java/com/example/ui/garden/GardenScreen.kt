@@ -65,8 +65,11 @@ fun GardenScreen(
     badgeCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    // Growth: one flower per 40 points, capped at a full bed of 18.
-    val flowers = (progress.points / 40).coerceIn(0, 18)
+    // Growth: one flower per 25 points (was 40 — real testing showed logging
+    // several things often moved nothing visibly, which read as "not
+    // syncing"; it was syncing, but the threshold hid it). At ~5-15 points
+    // per action, most days now visibly grow something.
+    val flowers = (progress.points / 25).coerceIn(0, 18)
     val butterflies = (progress.currentStreak / 3).coerceIn(0, 4)
     val goldBlooms = badgeCount.coerceAtMost(3)
 
@@ -107,7 +110,7 @@ fun GardenScreen(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             GardenStat("${flowers}", "blooms")
-            GardenStat("${(progress.points % 40) * 100 / 40}%", "next bud")
+            GardenStat("${(progress.points % 25) * 100 / 25}%", "next bud")
             GardenStat("$butterflies", if (butterflies == 1) "butterfly" else "butterflies")
         }
 

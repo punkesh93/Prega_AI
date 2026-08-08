@@ -76,6 +76,7 @@ fun HomeScreen(
     onToggleTheme: () -> Unit = {},
     onOpenJournal: () -> Unit = {},
     onOpenGarden: () -> Unit = {},
+    onOpenMenu: () -> Unit = {},
     onStepsGoal: () -> Unit = {},
     checkedInToday: Boolean = true,
     onWater: () -> Unit,
@@ -106,6 +107,7 @@ fun HomeScreen(
                 state = state,
                 isDark = isDark,
                 onToggleTheme = onToggleTheme,
+                onOpenMenu = onOpenMenu,
             )
         }
 
@@ -251,6 +253,7 @@ private fun HomeHeader(
     state: HomeState,
     isDark: Boolean,
     onToggleTheme: () -> Unit,
+    onOpenMenu: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -260,6 +263,24 @@ private fun HomeHeader(
             .padding(top = Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Avatar chip: her initial, opens the slide-out quick menu. The
+        // drawer also answers "everything is at the bottom" — every
+        // destination is now one tap from the top of the screen too.
+        Box(
+            Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(PregaTheme.colors.sageSoft)
+                .clickable(onClick = onOpenMenu),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                name.take(1).uppercase().ifBlank { "P" },
+                style = MaterialTheme.typography.titleMedium,
+                color = PregaTheme.colors.sage,
+            )
+        }
+        Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(
                 greetingFor(name),
@@ -405,6 +426,14 @@ private fun WeekHero(
         CornerBlobs(
             tint = PregaTheme.colors.cardSurface,
             modifier = Modifier.matchParentSize(),
+        )
+        LeafSprig(
+            color = PregaTheme.colors.ink.copy(alpha = 0.10f),
+            rotationDegrees = -8f,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(120.dp)
+                .padding(end = Space.sm, bottom = Space.xs),
         )
         Column(Modifier.padding(Space.lg)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -612,7 +612,7 @@ private fun ConfirmPage(
         footer = {
             PregaButton("This looks right", onNext)
             Spacer(Modifier.height(Space.sm))
-            PregaTextButton("Change my date", onBack)
+            PregaTextButton("Change my date", onBack, fillWidth = true)
         },
     ) {
         GradientCard(brush = PregaTheme.colors.bloomBrush) {

@@ -79,7 +79,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(Space.md))
                 // Straight to Play. No retention funnel, no exit survey.
-                PregaTextButton("Manage subscription", onManageSubscription)
+                PregaTextButton("Manage subscription", onManageSubscription, fillWidth = true)
             }
         } else {
             PregaCard(onClick = onUpgrade) {
@@ -242,7 +242,7 @@ fun SettingsScreen(
                 color = PregaTheme.colors.inkMuted,
             )
             Spacer(Modifier.height(Space.lg))
-            PregaTextButton("Export my data", onExportData)
+            PregaTextButton("Export my data", onExportData, fillWidth = true)
         }
 
         Spacer(Modifier.height(Space.lg))
@@ -309,7 +309,7 @@ fun SettingsScreen(
                 color = PregaTheme.colors.inkMuted,
             )
             Spacer(Modifier.height(Space.md))
-            PregaTextButton("Delete all my data", { confirmDelete = true })
+            PregaTextButton("Delete all my data", { confirmDelete = true }, fillWidth = true)
         }
 
         Spacer(Modifier.height(Space.xxl))

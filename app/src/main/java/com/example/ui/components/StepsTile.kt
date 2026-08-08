@@ -65,17 +65,36 @@ fun StepsTile(
     if (granted) {
         DisposableEffect(Unit) {
             val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+            val counter = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+            val detector = sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val raw = event.values.firstOrNull()?.toInt() ?: return
-                    stepsToday = stepsFromRaw(context, raw)
+                    when (event.sensor.type) {
+                        Sensor.TYPE_STEP_COUNTER -> {
+                            val raw = event.values.firstOrNull()?.toInt() ?: return
+                            stepsToday = stepsFromRaw(context, raw)
+                        }
+                        // The counter batches aggressively on many devices —
+                        // "walked 50 steps, still shows 0" from real testing.
+                        // The detector fires per step; incrementing from it
+                        // makes the tile live while the counter catches up
+                        // (counter events then overwrite with authority).
+                        Sensor.TYPE_STEP_DETECTOR -> {
+                            stepsToday += 1
+                            bumpCached(context, stepsToday)
+                        }
+                    }
                     maybeAward(context, stepsToday, onGoalReached)
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) = Unit
             }
-            if (sensor != null) {
-                sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+            // maxReportLatencyUs = 0: deliver immediately, don't batch.
+            if (counter != null) {
+                sm.registerListener(listener, counter, SensorManager.SENSOR_DELAY_UI, 0)
+            }
+            if (detector != null) {
+                sm.registerListener(listener, detector, SensorManager.SENSOR_DELAY_UI, 0)
             }
             onDispose { sm.unregisterListener(listener) }
         }
@@ -158,6 +177,13 @@ private fun stepsFromRaw(context: Context, raw: Int): Int {
     val steps = raw - baseline
     prefs.edit { putInt("cached", steps) }
     return steps
+}
+
+private fun bumpCached(context: Context, steps: Int) {
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        putString("day", LocalDate.now().toString())
+        putInt("cached", steps)
+    }
 }
 
 private fun readCachedSteps(context: Context): Int {

@@ -68,11 +68,24 @@ interface OpenRouterApi {
  * Verified against openrouter.ai/models on 6 Aug 2026. Model slugs move fast —
  * re-check before a release and update in one place here.
  */
+/**
+ * Cost note from real testing: credits were burning fast, so both tiers now
+ * point at a free chat model. (The specifically requested
+ * nvidia/nemotron-3-embed-1b cannot be used: it is an EMBEDDING model — it
+ * converts text to vectors for search and cannot generate a single word of
+ * reply. Wiring it in would silently break the coach, insights, captions,
+ * everything.) Llama 3.3 70B free is the strongest no-cost chat option on
+ * OpenRouter; quality for the coach will be a step below Claude — revert
+ * Conversational to "anthropic/claude-sonnet-4.5" the moment revenue
+ * justifies it, or when the Supabase proxy adds per-user rate limits.
+ * Free-tier models are also rate-limited by OpenRouter, so occasional
+ * "try again in a moment" fallbacks are expected under load.
+ */
 enum class PregaModel(val slug: String) {
     /** Coach conversations, meal plans — quality matters most. */
-    Conversational("anthropic/claude-sonnet-4.5"),
+    Conversational("meta-llama/llama-3.3-70b-instruct:free"),
     /** Notification copy, micro-content, quest text — high volume, short. */
-    Quick("anthropic/claude-haiku-4.5"),
+    Quick("meta-llama/llama-3.3-70b-instruct:free"),
 }
 
 // ─── Result type ───────────────────────────────────────────────────────────

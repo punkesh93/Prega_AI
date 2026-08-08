@@ -205,6 +205,7 @@ private fun AppointmentDialog(
     var location by remember { mutableStateOf(initial?.location ?: "") }
     var questions by remember { mutableStateOf(initial?.questionsToAsk ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -226,9 +227,13 @@ private fun AppointmentDialog(
                     },
                 )
                 OutlinedTextField(
-                    value = time, onValueChange = { time = it.take(5) },
-                    label = { Text("Time (e.g. 10:30, optional)") },
-                    singleLine = true,
+                    value = time,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Time (optional)") },
+                    trailingIcon = {
+                        PregaTextButton("Pick", { showTimePicker = true })
+                    },
                 )
                 OutlinedTextField(
                     value = location, onValueChange = { location = it },
@@ -261,6 +266,24 @@ private fun AppointmentDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+
+    if (showTimePicker) {
+        val tState = rememberTimePickerState(is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Pick a time") },
+            text = { TimePicker(state = tState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    time = "%02d:%02d".format(tState.hour, tState.minute)
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+            },
+        )
+    }
 
     if (showDatePicker) {
         val state = rememberDatePickerState()
