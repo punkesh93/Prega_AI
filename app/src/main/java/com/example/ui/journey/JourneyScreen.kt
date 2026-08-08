@@ -1,16 +1,24 @@
 package com.example.ui.journey
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -25,15 +33,20 @@ import com.example.ui.theme.trimesterColor
 import com.example.viewmodel.WeekInfo
 
 /**
- * Prega AI — Journey timeline.
+ * Prega AI — the Journey tab, redesigned around what the sparse first
+ * version was missing (driven by the user's reference mockups):
  *
- * All 40 weeks as a single scrollable spine, auto-scrolled to where she is now.
+ *  - a week-chip carousel so any week is one tap away, not forty scrolls
+ *  - a rich "you are here" hero that crossfades as chips are tapped, with
+ *    the stats strip (length / weight / countdown)
+ *  - this week's highlights: baby development AND, at last, the mother —
+ *    what she might notice, and one gentle tip (WeeklyExtras)
+ *  - compare-by-week: last week vs the selected week at a glance
+ *  - trimester progress, then the Bloom Ring, then the full 40-week
+ *    timeline for the readers
  *
- * Past weeks stay fully legible rather than being greyed out — this doubles as
- * a record of what she's already come through, which is most of its emotional
- * value. Future weeks are dimmed slightly to keep "now" findable, not to lock
- * them; she can read ahead freely, because people do, and pretending otherwise
- * just sends her to Google.
+ * The chips select any week; "you are here" styling follows the CURRENT
+ * week only, so exploration never lies about where she actually is.
  */
 @Composable
 fun JourneyScreen(
@@ -42,123 +55,432 @@ fun JourneyScreen(
     babyName: String,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
-    val weeks = remember { (1..40).toList() }
+    var selectedWeek by rememberSaveable { mutableStateOf(0) }
+    val shownWeek = if (selectedWeek == 0) currentWeek else selectedWeek
+    LaunchedEffect(currentWeek) { if (selectedWeek == 0) selectedWeek = currentWeek }
 
+    val chipState = rememberLazyListState()
     LaunchedEffect(currentWeek) {
-        // +1 accounts for the ring header item; land a week early so "now"
-        // isn't jammed against the top edge.
-        listState.scrollToItem((currentWeek - 1).coerceAtLeast(0))
+        chipState.scrollToItem((currentWeek - 2).coerceAtLeast(0))
     }
 
     LazyColumn(
-        state = listState,
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(
-            start = Space.gutter,
-            end = Space.gutter,
-            top = Space.lg,
-            bottom = Space.navClearance,
-        ),
+        contentPadding = PaddingValues(top = Space.lg, bottom = Space.navClearance),
     ) {
-        item(key = "bloom_ring") {
-            RingHeader(currentWeek)
+        item(key = "header") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                Text(
+                    "Your journey",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = PregaTheme.colors.ink,
+                )
+                Text(
+                    "Week by week, for both of you",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PregaTheme.colors.inkMuted,
+                )
+                Spacer(Modifier.height(Space.md))
+            }
         }
 
-        // What the tab is FOR, answered before the long scroll: where she is
-        // now in plain words, and a glance at what the next two weeks bring —
-        // pregnancy lives in the near future as much as the present.
-        item(key = "now_and_next") {
-            val now = weekInfoFor(currentWeek)
-            Column {
-                PregaCard(
-                    containerColor = PregaTheme.colors.terracottaSoft,
-                    border = false,
-                ) {
-                    Overline("Right now — week $currentWeek")
-                    Spacer(Modifier.height(Space.xs))
-                    Text(
-                        now.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = PregaTheme.colors.ink,
+        item(key = "chips") {
+            LazyRow(
+                state = chipState,
+                contentPadding = PaddingValues(horizontal = Space.gutter),
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+            ) {
+                items((1..40).toList(), key = { it }) { week ->
+                    WeekChip(
+                        info = weekInfoFor(week),
+                        selected = week == shownWeek,
+                        isCurrent = week == currentWeek,
+                        onClick = { selectedWeek = week },
                     )
                 }
-                if (currentWeek < 39) {
-                    Spacer(Modifier.height(Space.md))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                        (currentWeek + 1..(currentWeek + 2).coerceAtMost(40)).forEach { w ->
-                            val info = weekInfoFor(w)
-                            PregaCard(
-                                containerColor = PregaTheme.colors.sageSoft,
-                                border = false,
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Overline("Week $w")
-                                Spacer(Modifier.height(Space.xxs))
-                                Text(
-                                    "${info.iconEmoji} ${info.sizeName}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = PregaTheme.colors.ink,
-                                )
-                            }
-                        }
-                    }
+            }
+            Spacer(Modifier.height(Space.md))
+        }
+
+        item(key = "hero") {
+            Box(Modifier.padding(horizontal = Space.gutter)) {
+                AnimatedContent(
+                    targetState = shownWeek,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "weekHero",
+                ) { week ->
+                    SelectedWeekHero(
+                        info = weekInfoFor(week),
+                        isCurrent = week == currentWeek,
+                        babyName = babyName,
+                        daysToGo = ((40 - week) * 7),
+                    )
                 }
+            }
+            Spacer(Modifier.height(Space.md))
+        }
+
+        item(key = "highlights") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                HighlightsCard(weekInfoFor(shownWeek))
+                Spacer(Modifier.height(Space.md))
+            }
+        }
+
+        item(key = "compare") {
+            if (shownWeek > 1) {
+                Column(Modifier.padding(horizontal = Space.gutter)) {
+                    CompareCard(
+                        prev = weekInfoFor(shownWeek - 1),
+                        curr = weekInfoFor(shownWeek),
+                    )
+                    Spacer(Modifier.height(Space.md))
+                }
+            }
+        }
+
+        item(key = "trimester_progress") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                TrimesterProgress(currentWeek)
                 Spacer(Modifier.height(Space.lg))
             }
         }
 
-        items(weeks, key = { it }) { week ->
-            WeekRow(
-                info = weekInfoFor(week),
-                isCurrent = week == currentWeek,
-                isPast = week < currentWeek,
-                babyName = babyName,
-                isLast = week == 40,
+        item(key = "bloom_ring") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                RingHeader(currentWeek)
+            }
+        }
+
+        item(key = "timeline_header") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                SectionHeader(title = "All forty weeks", overline = "The long view")
+                Spacer(Modifier.height(Space.md))
+            }
+        }
+
+        items((1..40).toList(), key = { "w$it" }) { week ->
+            Box(Modifier.padding(horizontal = Space.gutter)) {
+                WeekRow(
+                    info = weekInfoFor(week),
+                    isCurrent = week == currentWeek,
+                    isPast = week < currentWeek,
+                    isLast = week == 40,
+                )
+            }
+        }
+    }
+}
+
+// ─── Week chips ────────────────────────────────────────────────────────────
+
+@Composable
+private fun WeekChip(
+    info: WeekInfo,
+    selected: Boolean,
+    isCurrent: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 2.dp else 1.dp,
+        label = "chipBorder",
+    )
+    val bg = when {
+        selected -> PregaTheme.colors.sageSoft
+        else -> PregaTheme.colors.cardSurface
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(bg)
+            .border(
+                width = borderWidth,
+                color = if (selected) PregaTheme.colors.sage else PregaTheme.colors.hairline,
+                shape = MaterialTheme.shapes.medium,
             )
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.md, vertical = Space.sm)
+            .width(64.dp),
+    ) {
+        Text(info.iconEmoji, fontSize = 24.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            if (isCurrent) "Now" else "Wk ${info.week}",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) PregaTheme.colors.ink else PregaTheme.colors.inkMuted,
+        )
+    }
+}
+
+// ─── Hero ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SelectedWeekHero(
+    info: WeekInfo,
+    isCurrent: Boolean,
+    babyName: String,
+    daysToGo: Int,
+) {
+    val tint = trimesterColor(info.trimester)
+
+    PregaCard(
+        containerColor = if (isCurrent) PregaTheme.colors.terracottaSoft
+        else PregaTheme.colors.cardSurface,
+        border = !isCurrent,
+        contentPadding = PaddingValues(Space.lg),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (isCurrent) {
+            Overline("You are here")
+            Spacer(Modifier.height(Space.xs))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Week ${info.week}",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = PregaTheme.colors.ink,
+                )
+                Text(
+                    if (babyName.isBlank() || !isCurrent) info.sizeName
+                    else "$babyName · ${info.sizeName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PregaTheme.colors.inkMuted,
+                )
+            }
+            Box(
+                Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(PregaTheme.colors.cardSurface.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Breathing { Text(info.iconEmoji, fontSize = 34.sp) }
+            }
+        }
+
+        Spacer(Modifier.height(Space.md))
+        Text(
+            info.description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = PregaTheme.colors.ink,
+        )
+
+        Spacer(Modifier.height(Space.md))
+        // The mockups' stats strip.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(PregaTheme.colors.cardSurface.copy(alpha = 0.7f))
+                .padding(vertical = Space.sm),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            StatCell("${info.lengthCm} cm", "length")
+            StatDivider(tint)
+            StatCell(formatWeight(info.weightGrams), "weight")
+            StatDivider(tint)
+            StatCell(if (daysToGo > 0) "$daysToGo" else "0", "days to go")
         }
     }
 }
 
 @Composable
-private fun RingHeader(currentWeek: Int) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // Fit-for-all-screens: the ring scales with the device instead of
-        // assuming a 216dp circle fits. On a narrow phone (or split screen)
-        // it shrinks; it never exceeds its designed size on a large one.
-        val ringSize = (maxWidth * 0.62f).coerceIn(160.dp, 232.dp)
-    Column(
+private fun StatCell(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            color = PregaTheme.colors.ink,
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
+    }
+}
+
+@Composable
+private fun StatDivider(tint: Color) {
+    Box(
         Modifier
-            .fillMaxWidth()
-            .padding(bottom = Space.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .width(1.dp)
+            .height(34.dp)
+            .background(tint.copy(alpha = 0.25f)),
+    )
+}
+
+// ─── Highlights ────────────────────────────────────────────────────────────
+
+@Composable
+private fun HighlightsCard(info: WeekInfo) {
+    val extras = WeeklyExtras.forWeek(info.week)
+
+    PregaCard(
+        containerColor = PregaTheme.colors.sageSoft,
+        border = false,
     ) {
-        BloomRing(currentWeek = currentWeek, size = ringSize) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "$currentWeek",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = PregaTheme.colors.ink,
-                )
-                Text(
-                    "of 40 weeks",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = PregaTheme.colors.inkMuted,
-                )
-            }
-        }
+        Overline("This week's highlights")
+        Spacer(Modifier.height(Space.sm))
+        HighlightRow("🌱", "Growing", info.description)
+        Spacer(Modifier.height(Space.sm))
+        HighlightRow("💛", "You might notice", extras.notice)
+        Spacer(Modifier.height(Space.sm))
+        HighlightRow("🕊️", "A gentle tip", extras.tip)
+    }
+}
 
-        Spacer(Modifier.height(Space.md))
-
-        // Trimester legend, so the ring's colour bands explain themselves.
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
-            LegendDot(BloomRingColors.first, "1st")
-            LegendDot(BloomRingColors.second, "2nd")
-            LegendDot(BloomRingColors.third, "3rd")
+@Composable
+private fun HighlightRow(emoji: String, title: String, body: String) {
+    Row {
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(PregaTheme.colors.cardSurface.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center,
+        ) { Text(emoji, fontSize = 17.sp) }
+        Spacer(Modifier.width(Space.md))
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = PregaTheme.colors.ink,
+            )
+            Text(
+                body,
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkMuted,
+            )
         }
     }
+}
+
+// ─── Compare ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun CompareCard(prev: WeekInfo, curr: WeekInfo) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+        CompareCell(prev, Modifier.weight(1f))
+        Column(
+            Modifier.align(Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "vs",
+                style = MaterialTheme.typography.labelMedium,
+                color = PregaTheme.colors.inkFaint,
+            )
+        }
+        CompareCell(curr, Modifier.weight(1f), emphasised = true)
+    }
+}
+
+@Composable
+private fun CompareCell(info: WeekInfo, modifier: Modifier = Modifier, emphasised: Boolean = false) {
+    PregaCard(
+        containerColor = if (emphasised) PregaTheme.colors.goldSoft
+        else PregaTheme.colors.cardSurface,
+        border = !emphasised,
+        contentPadding = PaddingValues(Space.md),
+        modifier = modifier,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Text(info.iconEmoji, fontSize = 26.sp)
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                "Wk ${info.week}",
+                style = MaterialTheme.typography.titleSmall,
+                color = PregaTheme.colors.ink,
+            )
+            Text(
+                "${info.lengthCm} cm · ${formatWeight(info.weightGrams)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkMuted,
+            )
+        }
+    }
+}
+
+// ─── Trimester progress ────────────────────────────────────────────────────
+
+@Composable
+private fun TrimesterProgress(currentWeek: Int) {
+    val trimester = when {
+        currentWeek <= 13 -> 1
+        currentWeek <= 27 -> 2
+        else -> 3
+    }
+    val (start, end) = when (trimester) {
+        1 -> 1 to 13
+        2 -> 14 to 27
+        else -> 28 to 40
+    }
+    val fraction = ((currentWeek - start + 1).toFloat() / (end - start + 1)).coerceIn(0f, 1f)
+    val animated by animateFloatAsState(fraction, label = "triProgress")
+
+    PregaCard(border = true) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "You're in trimester $trimester",
+                style = MaterialTheme.typography.titleMedium,
+                color = PregaTheme.colors.ink,
+            )
+            Text(
+                "${(fraction * 100).toInt()}%",
+                style = MaterialTheme.typography.titleMedium,
+                color = PregaTheme.colors.sage,
+            )
+        }
+        Spacer(Modifier.height(Space.sm))
+        PregaProgressBar(progress = animated, height = 6.dp)
+        Spacer(Modifier.height(Space.xs))
+        Text(
+            if (end - currentWeek > 0) "Ends in ${end - currentWeek + 1} weeks" else "Final stretch",
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkMuted,
+        )
+    }
+}
+
+// ─── Bloom ring (kept from the original design) ────────────────────────────
+
+@Composable
+private fun RingHeader(currentWeek: Int) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val ringSize = (maxWidth * 0.62f).coerceIn(160.dp, 232.dp)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = Space.xl),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            BloomRing(currentWeek = currentWeek, size = ringSize) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "$currentWeek",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                    Text(
+                        "of 40 weeks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PregaTheme.colors.inkMuted,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(Space.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
+                LegendDot(BloomRingColors.first, "1st")
+                LegendDot(BloomRingColors.second, "2nd")
+                LegendDot(BloomRingColors.third, "3rd")
+            }
+        }
     }
 }
 
@@ -180,19 +502,18 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
+// ─── Timeline rows ─────────────────────────────────────────────────────────
+
 @Composable
 private fun WeekRow(
     info: WeekInfo,
     isCurrent: Boolean,
     isPast: Boolean,
-    babyName: String,
     isLast: Boolean,
 ) {
     val tint = trimesterColor(info.trimester)
 
     Row(Modifier.height(IntrinsicSize.Min)) {
-
-        // The spine: a filled dot for weeks reached, a hollow one for ahead.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.width(40.dp),
@@ -225,76 +546,36 @@ private fun WeekRow(
 
         Spacer(Modifier.width(Space.md))
 
-        Column(Modifier.padding(bottom = Space.lg)) {
-            if (isCurrent) {
-                CurrentWeekCard(info, babyName, tint)
-            } else {
-                Column(
-                    Modifier
-                        .padding(top = Space.md)
-                        // Only future weeks dim, and only slightly.
-                        .alpha(if (isPast) 1f else 0.55f)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(info.iconEmoji, fontSize = 22.sp)
-                        Spacer(Modifier.width(Space.sm))
-                        Text(
-                            "Week ${info.week}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = PregaTheme.colors.ink,
-                        )
-                        Spacer(Modifier.width(Space.sm))
-                        Text(
-                            info.sizeName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PregaTheme.colors.inkFaint,
-                        )
-                    }
-                    Spacer(Modifier.height(Space.xs))
-                    Text(
-                        info.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PregaTheme.colors.inkMuted,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CurrentWeekCard(info: WeekInfo, babyName: String, tint: Color) {
-    GradientCard(
-        brush = androidx.compose.ui.graphics.Brush.linearGradient(
-            listOf(tint.copy(alpha = 0.92f), tint.copy(alpha = 0.7f))
-        ),
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(Space.lg),
-    ) {
-        Overline("You are here", color = Color.White.copy(alpha = 0.85f))
-        Spacer(Modifier.height(Space.sm))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+        Column(
+            Modifier
+                .padding(bottom = Space.lg, top = Space.md)
+                .alpha(if (isPast || isCurrent) 1f else 0.55f)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(info.iconEmoji, fontSize = 22.sp)
+                Spacer(Modifier.width(Space.sm))
                 Text(
                     "Week ${info.week}",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isCurrent) tint else PregaTheme.colors.ink,
                 )
+                Spacer(Modifier.width(Space.sm))
                 Text(
-                    if (babyName.isBlank()) info.sizeName else "$babyName · ${info.sizeName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f),
+                    info.sizeName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkFaint,
                 )
             }
-            Breathing { Text(info.iconEmoji, fontSize = 46.sp) }
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                info.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkMuted,
+            )
         }
-
-        Spacer(Modifier.height(Space.md))
-        Text(
-            info.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.95f),
-        )
     }
 }
+
+private fun formatWeight(grams: Double): String =
+    if (grams < 1000) "${grams.toInt()} g"
+    else String.format("%.1f kg", grams / 1000)

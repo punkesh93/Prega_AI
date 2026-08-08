@@ -18,6 +18,10 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.material3.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.*
@@ -102,29 +106,33 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
         item {
-            HomeHeader(
-                name = state.profile?.name.orEmpty(),
-                state = state,
-                isDark = isDark,
-                onToggleTheme = onToggleTheme,
-                onOpenMenu = onOpenMenu,
-            )
+            Reveal(0) {
+                HomeHeader(
+                    name = state.profile?.name.orEmpty(),
+                    state = state,
+                    isDark = isDark,
+                    onToggleTheme = onToggleTheme,
+                    onOpenMenu = onOpenMenu,
+                )
+            }
         }
 
         item {
+          Reveal(1) {
             WeekHero(
                 weekInfo = state.weekInfo,
                 babyName = state.profile?.babyNamePlaceholder.orEmpty(),
                 daysRemaining = state.daysRemaining,
                 onClick = onOpenJourney,
             )
+          }
         }
 
         if (!checkedInToday) {
-            item { CheckInCard(onOpenJournal) }
+            item { Reveal(2) { CheckInCard(onOpenJournal) } }
         }
 
-        item { InsightCard(state.insight, onOpenCoach) }
+        item { Reveal(3) { InsightCard(state.insight, onOpenCoach) } }
 
         state.affirmation?.let {
             item { AffirmationCard(it) }
@@ -163,6 +171,25 @@ fun HomeScreen(
 
         item { ProgressSection(state.progress) }
     }
+}
+
+
+/**
+ * Entrance choreography: each home section fades and rises in, one beat
+ * after the previous — the screen assembles itself like a page settling,
+ * instead of appearing as a wall. Runs once per composition of the tab.
+ */
+@Composable
+private fun Reveal(index: Int, content: @Composable () -> Unit) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60L * index)
+        shown = true
+    }
+    AnimatedVisibility(
+        visible = shown,
+        enter = fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 6 },
+    ) { content() }
 }
 
 // ─── Sections ──────────────────────────────────────────────────────────────
