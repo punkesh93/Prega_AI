@@ -83,9 +83,9 @@ interface OpenRouterApi {
  */
 enum class PregaModel(val slug: String) {
     /** Coach conversations, meal plans — quality matters most. */
-    Conversational("meta-llama/llama-3.3-70b-instruct:free"),
+    Conversational("google/gemma-4-26b-a4b-it:free"),
     /** Notification copy, micro-content, quest text — high volume, short. */
-    Quick("meta-llama/llama-3.3-70b-instruct:free"),
+    Quick("google/gemma-4-26b-a4b-it:free"),
 }
 
 // ─── Result type ───────────────────────────────────────────────────────────

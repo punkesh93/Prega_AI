@@ -290,23 +290,12 @@ private fun HomeHeader(
             .padding(top = Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Avatar chip: her initial, opens the slide-out quick menu. The
-        // drawer also answers "everything is at the bottom" — every
-        // destination is now one tap from the top of the screen too.
-        Box(
-            Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(PregaTheme.colors.sageSoft)
-                .clickable(onClick = onOpenMenu),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                name.take(1).uppercase().ifBlank { "P" },
-                style = MaterialTheme.typography.titleMedium,
-                color = PregaTheme.colors.sage,
-            )
-        }
+        // Avatar chip: her photo (or initial), opens the slide-out menu.
+        ProfileAvatar(
+            name = name,
+            size = 42.dp,
+            onClick = onOpenMenu,
+        )
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(
@@ -855,11 +844,15 @@ private fun QuickLog(
                 onTap = onVitamins,
                 modifier = Modifier.weight(1f),
             )
-            StepsTile(
-                onGoalReached = onStepsGoal,
-                modifier = Modifier.weight(1f),
-            )
         }
+
+        Spacer(Modifier.height(Space.md))
+        // Steps on its own row: three tiles across was cramped on real
+        // devices, and the step tile's progress bar earns the width.
+        StepsTile(
+            onGoalReached = onStepsGoal,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Spacer(Modifier.height(Space.md))
 

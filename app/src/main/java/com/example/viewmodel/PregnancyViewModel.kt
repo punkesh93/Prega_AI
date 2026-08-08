@@ -1084,6 +1084,16 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         val p = profile.value
         val week = p?.currentWeek ?: 12
 
+        // Freshness guard: hand the model the last two days' quests and forbid
+        // repeats. Without this, similar prompts on similar weeks converge on
+        // the same three suggestions — "changed every day" was the explicit ask.
+        val recentTitles = runCatching {
+            val today = java.time.LocalDate.parse(date)
+            (1..2).flatMap { d ->
+                repository.getQuestsForDateOnce(today.minusDays(d.toLong()).toString())
+            }.map { it.title }
+        }.getOrDefault(emptyList())
+
         val generated = OpenRouterClient.completeOrNull(
             systemPrompt = PregaPrompts.questCopy(
                 week = week,
@@ -1091,7 +1101,13 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 babyName = p?.babyNamePlaceholder.orEmpty(),
                 name = p?.name.orEmpty(),
             ),
-            userPrompt = "Give me today's three quests.",
+            userPrompt = buildString {
+                append("Give me today's three quests.")
+                if (recentTitles.isNotEmpty()) {
+                    append(" These were the last days' quests — do NOT repeat or lightly rephrase any of them: ")
+                    append(recentTitles.joinToString("; "))
+                }
+            },
             model = PregaModel.Quick,
             temperature = 1.0,
             maxTokens = 250,

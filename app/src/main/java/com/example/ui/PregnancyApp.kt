@@ -190,19 +190,19 @@ private fun AppDrawer(
     ) {
         Column(Modifier.padding(Space.gutter)) {
             Spacer(Modifier.height(Space.xl))
-            Box(
-                Modifier
-                    .size(64.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(PregaTheme.colors.sageSoft),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    name.take(1).uppercase().ifBlank { "P" },
-                    style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
-                    color = PregaTheme.colors.sage,
-                )
-            }
+            // Editable here: tapping her avatar in the drawer opens the
+            // photo picker. This is THE place to set a profile photo.
+            com.example.ui.components.ProfileAvatar(
+                name = name,
+                size = 72.dp,
+                editable = true,
+            )
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                "Tap to change photo",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkFaint,
+            )
             Spacer(Modifier.height(Space.md))
             Text(
                 name.ifBlank { "You" },
@@ -264,6 +264,10 @@ private fun MainScaffold(
     var showPaywall by rememberSaveable { mutableStateOf(false) }
     var showJournal by rememberSaveable { mutableStateOf(false) }
     var showAppointments by rememberSaveable { mutableStateOf(false) }
+    // Hoisted so the drawer can land on a SPECIFIC section — with the state
+    // private to YouTab, "Settings" in the menu could only ever reach the
+    // tab's front door (the garden), which is the routing bug reported.
+    var youSection by rememberSaveable { mutableStateOf(0) }
 
     // Slide-out quick menu. Declared HERE — beside the tab/overlay state it
     // drives — after a scope bug: the first draft placed the drawer a level
@@ -346,10 +350,10 @@ private fun MainScaffold(
                     drawerScope.launch { drawerState.close() }
                     when (destination) {
                         "journal" -> { viewModel.refreshCheckInState(); showJournal = true }
-                        "garden" -> tab = Tab.You
+                        "garden" -> { youSection = 0; tab = Tab.You }
                         "appointments" -> showAppointments = true
-                        "badges" -> tab = Tab.You
-                        "settings" -> tab = Tab.You
+                        "badges" -> { youSection = 1; tab = Tab.You }
+                        "settings" -> { youSection = 2; tab = Tab.You }
                         "premium" -> showPaywall = true
                         "kicks" -> tab = Tab.Kicks
                         "coach" -> tab = Tab.Coach
@@ -402,7 +406,7 @@ private fun MainScaffold(
                         onOpenCoach = { tab = Tab.Coach },
                         onOpenJourney = { tab = Tab.Journey },
                         onOpenAppointments = { showAppointments = true },
-                        onOpenGarden = { tab = Tab.You },
+                        onOpenGarden = { youSection = 0; tab = Tab.You },
                         onStepsGoal = viewModel::onStepsGoalReached,
                         onOpenMenu = { drawerScope.launch { drawerState.open() } },
                         onOpenJournal = {
@@ -449,6 +453,8 @@ private fun MainScaffold(
                         onNotificationsToggled = onNotificationsToggled,
                         themeMode = themeMode,
                         onThemeModeChange = onThemeModeChange,
+                        section = youSection,
+                        onSectionChange = { youSection = it },
                     )
                 }
             }
@@ -529,9 +535,9 @@ private fun YouTab(
     onNotificationsToggled: (Boolean) -> Unit,
     themeMode: com.example.ui.theme.ThemeMode,
     onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
+    section: Int,
+    onSectionChange: (Int) -> Unit,
 ) {
-    // Garden first: the game is the tab's front door.
-    var section by rememberSaveable { mutableStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -540,9 +546,9 @@ private fun YouTab(
                 .padding(horizontal = Space.gutter, vertical = Space.md),
             horizontalArrangement = Arrangement.spacedBy(Space.sm),
         ) {
-            com.example.ui.components.PregaChip("Garden", section == 0, { section = 0 })
-            com.example.ui.components.PregaChip("Badges", section == 1, { section = 1 })
-            com.example.ui.components.PregaChip("Settings", section == 2, { section = 2 })
+            com.example.ui.components.PregaChip("Garden", section == 0, { onSectionChange(0) })
+            com.example.ui.components.PregaChip("Badges", section == 1, { onSectionChange(1) })
+            com.example.ui.components.PregaChip("Settings", section == 2, { onSectionChange(2) })
         }
 
         if (section == 0) {

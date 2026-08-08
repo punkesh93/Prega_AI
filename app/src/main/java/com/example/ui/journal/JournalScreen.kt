@@ -303,6 +303,7 @@ private fun EntryCard(
 ) {
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
+    var showViewer by remember { mutableStateOf(false) }
 
     // Decode off the main thread; small screens, small files, but never jank.
     val bitmap by produceState<android.graphics.Bitmap?>(null, entry.photoFile) {
@@ -326,12 +327,13 @@ private fun EntryCard(
                 )
                 androidx.compose.foundation.Image(
                     bitmap = it.asImageBitmap(),
-                    contentDescription = null,
+                    contentDescription = "Open photo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(210.dp)
-                        .graphicsLayer { alpha = photoAlpha },
+                        .graphicsLayer { alpha = photoAlpha }
+                        .clickable { showViewer = true },
                 )
             }
             Column(Modifier.padding(Space.lg)) {
@@ -365,6 +367,32 @@ private fun EntryCard(
                         )
                     }
                     PregaTextButton("Remove", { confirmDelete = true })
+                }
+            }
+        }
+    }
+
+    // Full-screen photo viewer — the reported gap: photos displayed but a
+    // tap did nothing. Dark room, image fit to screen, tap anywhere closes.
+    if (showViewer && bitmap != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showViewer = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.92f))
+                    .clickable { showViewer = false },
+                contentAlignment = Alignment.Center,
+            ) {
+                bitmap?.let {
+                    androidx.compose.foundation.Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "Photo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }

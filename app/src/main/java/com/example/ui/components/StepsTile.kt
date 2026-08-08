@@ -62,8 +62,12 @@ fun StepsTile(
 
     var stepsToday by remember { mutableStateOf(readCachedSteps(context)) }
 
+    var sensorMissing by remember { mutableStateOf(false) }
+
     if (granted) {
-        DisposableEffect(Unit) {
+        // Keyed on `granted`: guarantees registration runs the moment
+        // permission is granted mid-session, not only on a fresh entry.
+        DisposableEffect(granted) {
             val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val counter = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
             val detector = sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
@@ -90,6 +94,7 @@ fun StepsTile(
                 override fun onAccuracyChanged(s: Sensor?, a: Int) = Unit
             }
             // maxReportLatencyUs = 0: deliver immediately, don't batch.
+            sensorMissing = counter == null && detector == null
             if (counter != null) {
                 sm.registerListener(listener, counter, SensorManager.SENSOR_DELAY_UI, 0)
             }
@@ -129,6 +134,12 @@ fun StepsTile(
             if (!granted) {
                 Text(
                     "Tap to count today's walk",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+            } else if (sensorMissing) {
+                Text(
+                    "This phone has no step sensor",
                     style = MaterialTheme.typography.bodySmall,
                     color = PregaTheme.colors.inkMuted,
                 )

@@ -680,6 +680,30 @@ private fun AboutYouPage(
         subtitle = "Both optional. Skip anything you'd rather not share.",
         footer = { PregaButton(if (name.isBlank()) "Skip for now" else "Continue", onNext) },
     ) {
+        // Optional photo, from day one — tap the circle. Editable everywhere
+        // later (drawer), so skipping costs nothing.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            com.example.ui.components.ProfileAvatar(
+                name = name,
+                size = 84.dp,
+                editable = true,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                "Add a photo (optional)",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkFaint,
+            )
+        }
+        Spacer(Modifier.height(Space.md))
+
         OutlinedTextField(
             value = name,
             onValueChange = { onNameChange(it.take(40)) },

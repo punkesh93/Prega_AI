@@ -70,7 +70,9 @@ fun GardenScreen(
     // syncing"; it was syncing, but the threshold hid it). At ~5-15 points
     // per action, most days now visibly grow something.
     val flowers = (progress.points / 25).coerceIn(0, 18)
-    val butterflies = (progress.currentStreak / 3).coerceIn(0, 4)
+    // Ceil, not floor: a 1-day streak already brings the first butterfly —
+    // real testing had a 2-day streak and an empty sky, which read as broken.
+    val butterflies = ((progress.currentStreak + 2) / 3).coerceIn(0, 4)
     val goldBlooms = badgeCount.coerceAtMost(3)
 
     Column(
