@@ -530,6 +530,11 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     private val _dailyInsight = MutableStateFlow<String?>(null)
     val dailyInsight: StateFlow<String?> = _dailyInsight.asStateFlow()
 
+    /** Total distinct days she has logged anything — drives Garden Visitors. */
+    val daysActive: StateFlow<Int> = repository.getAllDailyLogs()
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     // --- Journal ---
     val journalEntries = repository.getJournalEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

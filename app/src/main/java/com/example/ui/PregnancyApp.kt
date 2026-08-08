@@ -552,9 +552,11 @@ private fun YouTab(
         }
 
         if (section == 0) {
+            val daysActive by viewModel.daysActive.collectAsStateWithLifecycle()
             com.example.ui.garden.GardenScreen(
                 progress = progress,
                 badgeCount = badges.size,
+                daysActive = daysActive,
             )
         } else if (section == 1) {
             BadgesScreen(earned = badges, progress = progress)

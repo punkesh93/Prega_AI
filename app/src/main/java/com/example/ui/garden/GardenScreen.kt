@@ -7,14 +7,18 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -63,8 +67,20 @@ import kotlin.random.Random
 fun GardenScreen(
     progress: ProgressEntity,
     badgeCount: Int,
+    daysActive: Int = 0,
     modifier: Modifier = Modifier,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Discovery: any unlocked visitor she hasn't been introduced to yet gets
+    // a reveal moment, one per garden visit so arrivals never stack into
+    // a popup queue.
+    val unlockedVisitors = remember(daysActive) { VisitorBook.unlocked(daysActive) }
+    var revealVisitor by remember { mutableStateOf<Visitor?>(null) }
+    LaunchedEffect(daysActive) {
+        val seen = VisitorBook.seen(context)
+        revealVisitor = unlockedVisitors.firstOrNull { it.id !in seen }
+    }
     // Growth: one flower per 25 points (was 40 — real testing showed logging
     // several things often moved nothing visibly, which read as "not
     // syncing"; it was syncing, but the threshold hid it). At ~5-15 points
@@ -92,6 +108,7 @@ fun GardenScreen(
                 flowers = flowers,
                 butterflies = butterflies,
                 goldBlooms = goldBlooms,
+                visitors = unlockedVisitors,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp),
@@ -127,9 +144,157 @@ fun GardenScreen(
                 color = PregaTheme.colors.ink,
             )
         }
+
+        Spacer(Modifier.height(Space.lg))
+        SectionHeader(title = "Visitors", overline = "They come when you keep coming")
+        Spacer(Modifier.height(Space.md))
+        VisitorShelf(daysActive = daysActive)
+
         Spacer(Modifier.height(Space.xl))
     }
+
+    // The arrival moment: cream card, the creature drawn LIVE (it idles in
+    // its reveal, same code as the garden), name and bio, tap to welcome.
+    revealVisitor?.let { v ->
+        VisitorReveal(
+            visitor = v,
+            onDismiss = {
+                VisitorBook.markSeen(context, v.id)
+                revealVisitor = null
+            },
+        )
+    }
 }
+
+// ─── Visitor collection shelf ──────────────────────────────────────────────
+
+@Composable
+private fun VisitorShelf(daysActive: Int) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        items(VISITORS.size) { i ->
+            val v = VISITORS[i]
+            val here = daysActive >= v.daysNeeded
+            PregaCard(
+                containerColor = if (here) PregaTheme.colors.cardSurface
+                else PregaTheme.colors.recessed,
+                border = here,
+                contentPadding = PaddingValues(Space.sm),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(96.dp),
+                ) {
+                    VisitorPortrait(id = v.id, discovered = here)
+                    Spacer(Modifier.height(Space.xs))
+                    Text(
+                        if (here) v.name else "???",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (here) PregaTheme.colors.ink else PregaTheme.colors.inkFaint,
+                    )
+                    Text(
+                        if (here) v.bio
+                        else "Arrives after ${v.daysNeeded} active days",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PregaTheme.colors.inkFaint,
+                        maxLines = 3,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A small live portrait: discovered visitors idle; locked ones are shadows. */
+@Composable
+private fun VisitorPortrait(id: String, discovered: Boolean) {
+    val transition = rememberInfiniteTransition(label = "portrait")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.2832f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing)),
+        label = "portraitClock",
+    )
+    Canvas(Modifier.size(72.dp)) {
+        if (discovered) {
+            drawVisitor(id, size.width / 2f, size.height * 0.62f, size.height * 0.16f, t)
+        } else {
+            // Silhouette: the same creature, all-shadow — a promise, not a spoiler.
+            drawCircle(
+                Color(0xFF5A503C).copy(alpha = 0.25f),
+                radius = size.minDimension * 0.30f,
+                center = Offset(size.width / 2f, size.height * 0.55f),
+            )
+            drawCircle(
+                Color(0xFF5A503C).copy(alpha = 0.35f),
+                radius = size.minDimension * 0.12f,
+                center = Offset(size.width / 2f, size.height * 0.30f),
+            )
+        }
+    }
+}
+
+// ─── Arrival reveal ────────────────────────────────────────────────────────
+
+@Composable
+private fun VisitorReveal(visitor: Visitor, onDismiss: () -> Unit) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val transition = rememberInfiniteTransition(label = "reveal")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.2832f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing)),
+        label = "revealClock",
+    )
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(PregaTheme.colors.ink.copy(alpha = 0.30f))
+            .androidClickableNoRipple(interaction, onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .padding(Space.xxl)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(PregaTheme.colors.cardSurface)
+                .padding(horizontal = Space.xxl, vertical = Space.xl),
+        ) {
+            Canvas(Modifier.size(140.dp)) {
+                drawVisitor(visitor.id, size.width / 2f, size.height * 0.62f, size.height * 0.15f, t)
+            }
+            Spacer(Modifier.height(Space.md))
+            Text(
+                "${visitor.name} has moved in!",
+                style = MaterialTheme.typography.headlineSmall,
+                color = PregaTheme.colors.ink,
+            )
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                visitor.bio,
+                style = MaterialTheme.typography.bodyMedium,
+                color = PregaTheme.colors.inkMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(Space.lg))
+            Text(
+                "Tap to welcome",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkFaint,
+            )
+        }
+    }
+}
+
+private fun Modifier.androidClickableNoRipple(
+    interaction: androidx.compose.foundation.interaction.MutableInteractionSource,
+    onClick: () -> Unit,
+): Modifier = this.then(
+    Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick)
+)
 
 @Composable
 private fun GardenStat(value: String, label: String) {
@@ -154,6 +319,7 @@ private fun GardenCanvas(
     flowers: Int,
     butterflies: Int,
     goldBlooms: Int,
+    visitors: List<Visitor> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     // Deterministic layout: the same garden every time she opens it. Seeded
@@ -244,6 +410,17 @@ private fun GardenCanvas(
             val bx = cx + sin(t + b * 1.7f) * size.width * 0.10f
             val by = cy + sin(2f * (t + b * 1.7f)) * size.height * 0.05f
             drawButterfly(bx, by, flap = sin(t * 6f + b) * 0.4f + 0.8f)
+        }
+
+        // Visitors, placed at seeded spots front-to-back. Depth is the
+        // dioramic trick: farther creatures sit higher on the mound and
+        // draw smaller, closer ones larger — the eye reads distance.
+        visitors.forEachIndexed { i, v ->
+            val depth = listOf(0.9f, 0.5f, 1.0f, 0.6f, 0.75f, 0.55f, 0.95f, 0.8f)[i % 8]
+            val xf = listOf(0.14f, 0.68f, 0.42f, 0.82f, 0.58f, 0.26f, 0.72f, 0.30f)[i % 8]
+            val baseY = size.height * (0.70f + 0.18f * depth)
+            val scale = size.height * 0.035f * (0.65f + 0.55f * depth)
+            drawVisitor(v.id, size.width * xf, baseY, scale, t + i * 1.3f)
         }
     }
 }
