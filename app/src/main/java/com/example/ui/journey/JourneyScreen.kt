@@ -129,6 +129,13 @@ fun JourneyScreen(
             }
         }
 
+        item(key = "body_this_week") {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                BodyThisWeekCard(shownWeek)
+                Spacer(Modifier.height(Space.md))
+            }
+        }
+
         item(key = "compare") {
             if (shownWeek > 1) {
                 Column(Modifier.padding(horizontal = Space.gutter)) {
@@ -357,6 +364,54 @@ private fun HighlightRow(emoji: String, title: String, body: String) {
                 color = PregaTheme.colors.inkMuted,
             )
         }
+    }
+}
+
+// ─── Your body this week ───────────────────────────────────────────────────
+
+/**
+ * The likely-symptoms card: three things many women feel at this stage, each
+ * with what gently helps and one plain sentence of why. Deliberately capped
+ * at three — enough to feel understood and equipped, never enough to feel
+ * diagnosed — and it always closes with the same honest line about when a
+ * feeling stops being an app's business.
+ */
+@Composable
+private fun BodyThisWeekCard(week: Int) {
+    val symptoms = WeeklyExtras.symptomsForWeek(week)
+
+    PregaCard(
+        containerColor = PregaTheme.colors.lavenderSoft,
+        border = false,
+    ) {
+        Overline("Your body this week")
+        Spacer(Modifier.height(Space.sm))
+        symptoms.forEachIndexed { i, sy ->
+            if (i > 0) Spacer(Modifier.height(Space.md))
+            Text(
+                sy.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = PregaTheme.colors.ink,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                sy.doThis,
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.ink,
+            )
+            Text(
+                "Why: ${sy.why}",
+                style = MaterialTheme.typography.bodySmall,
+                color = PregaTheme.colors.inkMuted,
+            )
+        }
+        Spacer(Modifier.height(Space.md))
+        Text(
+            "Every body does this differently. Anything sharp, sudden, or that " +
+                "simply feels wrong is a midwife question, not an app question.",
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
     }
 }
 
