@@ -23,6 +23,7 @@ class PregnancyRepository(private val dao: PregnancyDao) {
     fun getDailyLogsSince(since: String): Flow<List<DailyLogEntity>> = dao.getDailyLogsSince(since)
     suspend fun saveDailyLog(log: DailyLogEntity) = dao.insertDailyLog(log)
     suspend fun deleteAllDailyLogs() = dao.deleteAllDailyLogs()
+    fun getAllActiveDates(): Flow<List<String>> = dao.getAllActiveDates()
 
     // ── Kicks ────────────────────────────────────────────────────────────
     fun getAllKickLogs(): Flow<List<KickLogEntity>> = dao.getAllKickLogs()

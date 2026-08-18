@@ -418,19 +418,36 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
 
             // Free-tier gate. Premium is granted only by the billing client.
             if (currentProfile != null && !currentProfile.isPremium) {
-                if (currentProfile.freeQuestionsRemaining <= 0) {
+                val today = _todayDate.value
+
+                // Daily top-up: 5 questions PER DAY, not 5 ever. Without this
+                // check, freeQuestionsRemaining only ever counted down and a
+                // free user who used her 5 questions once was locked out of
+                // Prega AI for good.
+                val profileForToday = if (currentProfile.lastQuestionResetDate != today) {
+                    currentProfile.copy(
+                        freeQuestionsRemaining = 5,
+                        lastQuestionResetDate = today,
+                    )
+                } else {
+                    currentProfile
+                }
+
+                if (profileForToday.freeQuestionsRemaining <= 0) {
+                    if (profileForToday !== currentProfile) repository.saveUserProfile(profileForToday)
                     _chatMessages.value = _chatMessages.value + ChatMessage(
-                        text = "You've used your free questions for now. Premium unlocks " +
-                            "unlimited questions, weekly meal plans tailored to how you're " +
-                            "actually feeling, and your full kick history.",
+                        text = "You've used today's free questions. They'll top back up " +
+                            "tomorrow, or Premium unlocks unlimited questions, weekly meal " +
+                            "plans tailored to how you're actually feeling, and your full " +
+                            "kick history.",
                         isUser = false,
                     )
                     _chatLoading.value = false
                     return@launch
                 }
                 repository.saveUserProfile(
-                    currentProfile.copy(
-                        freeQuestionsRemaining = currentProfile.freeQuestionsRemaining - 1
+                    profileForToday.copy(
+                        freeQuestionsRemaining = profileForToday.freeQuestionsRemaining - 1
                     )
                 )
             }
@@ -530,8 +547,15 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     private val _dailyInsight = MutableStateFlow<String?>(null)
     val dailyInsight: StateFlow<String?> = _dailyInsight.asStateFlow()
 
-    /** Total distinct days she has logged anything — drives Garden Visitors. */
-    val daysActive: StateFlow<Int> = repository.getAllDailyLogs()
+    /**
+     * Total distinct days she has logged anything — drives Garden Visitors.
+     * Was undercounting: it only read daily_logs (water/vitamins/weight/
+     * symptoms taps), so a user doing just the mood + journal check-in every
+     * day — the most common path — never moved this number and visitors
+     * never unlocked. Now reads the union across daily_logs, mood_logs, and
+     * journal_entries (see PregnancyDao.getAllActiveDates).
+     */
+    val daysActive: StateFlow<Int> = repository.getAllActiveDates()
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 

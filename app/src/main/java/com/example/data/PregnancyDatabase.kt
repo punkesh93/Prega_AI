@@ -24,6 +24,13 @@ data class UserProfileEntity(
     val isPremium: Boolean = false,
     val premiumPurchaseDate: String = "",
     val freeQuestionsRemaining: Int = 5,
+    /**
+     * yyyy-MM-dd of the last day freeQuestionsRemaining was topped back up
+     * to 5. Without this, the counter only ever counted down and a free
+     * user who used her 5 questions once was locked out of Prega AI
+     * permanently (see MIGRATION_5_6, PregnancyViewModel.askCoach).
+     */
+    val lastQuestionResetDate: String = "",
 
     val lmpDate: String = "",
     val testDate: String = "",
@@ -107,6 +114,20 @@ interface PregnancyDao {
 
     @Query("SELECT * FROM daily_logs ORDER BY date DESC")
     fun getAllDailyLogs(): Flow<List<DailyLogEntity>>
+
+    /**
+     * Distinct dates with ANY sign of life, unioned across every daily touch
+     * point (tiles, mood check-in, journal). Garden Visitors reads this —
+     * see PregnancyViewModel.daysActive. A user who only ever does the daily
+     * mood + journal check-in (the most common path) never writes a
+     * daily_logs row, so daily_logs alone undercounts her badly.
+     */
+    @Query(
+        "SELECT date FROM daily_logs " +
+        "UNION SELECT date FROM mood_logs " +
+        "UNION SELECT date FROM journal_entries"
+    )
+    fun getAllActiveDates(): Flow<List<String>>
 
     @Query("SELECT * FROM daily_logs WHERE date >= :since ORDER BY date ASC")
     fun getDailyLogsSince(since: String): Flow<List<DailyLogEntity>>
@@ -244,7 +265,7 @@ interface PregnancyDao {
         WeightEntity::class,
         JournalEntity::class,
     ],
-    version = 5,
+    version = 6,
     // Schemas are exported to app/schemas so migrations can be tested against
     // real historical schemas rather than written blind.
     exportSchema = true,

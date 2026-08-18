@@ -177,5 +177,16 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Tracks the last day the free-question count was topped up, so
+        // Prega AI's 5-questions-a-day limit actually resets daily instead
+        // of being a lifetime cap. Additive only.
+        db.execSQL(
+            "ALTER TABLE user_profile ADD COLUMN lastQuestionResetDate TEXT NOT NULL DEFAULT ''"
+        )
+    }
+}
+
 /** Every migration the app knows about. Pass to `addMigrations(*ALL_MIGRATIONS)`. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4, MIGRATION_4_5)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
