@@ -23,7 +23,7 @@
     --terracotta-soft:#F5D9CC;
   }
   *{box-sizing:border-box;}
-  html{scroll-behavior:smooth;}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   body{
     margin:0;
     background:var(--linen);
@@ -137,7 +137,7 @@
   }
 
   /* ---- Sections ---- */
-  section{padding:56px 0;}
+  section{padding:56px 0;scroll-margin-top:76px;}
   .band{background:var(--shell);}
   .eyebrow-sm{
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -199,11 +199,58 @@
   footer a{color:var(--ink-muted);text-decoration:none;font-size:0.85rem;}
 
   @media (max-width:640px){
-    .hero-grid{flex-direction:column;text-align:center;}
+    /* Layout: stack and centre */
+    .hero-grid{flex-direction:column;text-align:center;gap:28px;}
     .cta-row{justify-content:center;}
     .cards{grid-template-columns:1fr;}
-    nav .links{gap:14px;}
+
+    /* Rhythm: tighter vertical spacing so sections don't feel like chasms
+       on a narrow screen */
+    .hero{padding:40px 0 32px;}
+    section{padding:40px 0;}
+    .wrap{padding:0 20px;}
+
+    /* Hero art a touch smaller so the headline gets the room */
+    .hero-art{flex-basis:auto;}
+    .hero-art svg{max-width:132px !important;}
+
+    /* Type: slightly smaller lede, but never below comfortable reading */
+    .lede{font-size:1.05rem;}
+    h2{font-size:1.45rem;}
+    .section-lede{font-size:0.98rem;}
+
+    /* Buttons: full-width, thumb-sized tap targets */
+    .cta-row{flex-direction:column;align-items:stretch;}
+    .btn{justify-content:center;padding:15px 22px;font-size:1rem;}
+
+    /* Nav: keep everything on one line without crowding */
+    nav .wrap{height:56px;}
+    .brand{font-size:1rem;}
+    .brand svg{width:22px;height:22px;}
+    nav .links{gap:4px;}
+    nav .links a{font-size:0.85rem;padding:10px 8px;}
+
+    /* Policy text: a touch more air between lines for long-form reading */
+    .policy-block p, .policy-block li{font-size:0.95rem;line-height:1.65;}
+    .promise{padding:22px 20px;}
+    .promise p{font-size:1rem;}
+
+    /* Cards breathe a little less padding, content unchanged */
+    .card{padding:20px 18px;}
+
+    /* Footer stacks and centres */
+    footer .wrap{flex-direction:column;text-align:center;}
+
+    /* Decorative petals shrink out of the text's way */
+    .petal{transform:scale(0.6);opacity:0.35;}
   }
+
+  /* Very small phones: drop the GitHub nav link (it's repeated in the
+     footer) so the four items never wrap or squash the brand */
+  @media (max-width:380px){
+    nav .links a[href*="github"]{display:none;}
+  }
+
   @media (prefers-reduced-motion: reduce){
     html{scroll-behavior:auto;}
   }
