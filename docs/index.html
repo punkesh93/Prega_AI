@@ -166,6 +166,18 @@
   .t-gold{background:#F3E3C4;}
   .t-olive{background:var(--olive-whisper);}
 
+  /* ---- Video (YouTube Short, vertical 9:16) ---- */
+  .video-frame{
+    display:block;margin:0 auto;
+    width:min(320px, 78vw);
+    aspect-ratio:9/16;
+    border:0;border-radius:26px;
+    background:var(--shell);
+    box-shadow:0 10px 30px rgba(58,52,42,0.10);
+  }
+  #watch .wrap{text-align:center;}
+  #watch .section-lede{margin-left:auto;margin-right:auto;}
+
   /* ---- Privacy ---- */
   #privacy h2{margin-top:0;}
   .promise{
@@ -245,9 +257,9 @@
     .petal{transform:scale(0.6);opacity:0.35;}
   }
 
-  /* Very small phones: drop the GitHub nav link (it's repeated in the
-     footer) so the four items never wrap or squash the brand */
-  @media (max-width:380px){
+  /* Small phones: drop the GitHub nav link (it's repeated in the
+     footer) so the five items never wrap or squash the brand */
+  @media (max-width:480px){
     nav .links a[href*="github"]{display:none;}
   }
 
@@ -266,6 +278,7 @@
     </a>
     <div class="links">
       <a href="#about">About</a>
+      <a href="#watch">Watch</a>
       <a href="#download">Download</a>
       <a href="#privacy">Privacy</a>
       <a href="https://github.com/punkesh93/Prega_AI">GitHub</a>
@@ -336,7 +349,23 @@
   </div>
 </section>
 
-<section id="download">
+<section id="watch">
+  <div class="wrap">
+    <div class="eyebrow-sm">See it in action</div>
+    <h2>Watch Prega AI in under a minute</h2>
+    <p class="section-lede">A quick look at the app — the garden, the coach, and the daily rhythm.</p>
+    <iframe
+      class="video-frame"
+      src="https://www.youtube-nocookie.com/embed/OH9BmH2xlMo"
+      title="Prega AI — app walkthrough"
+      loading="lazy"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </div>
+</section>
+
+<section id="download" class="band">
   <div class="wrap">
     <div class="eyebrow-sm">Get the app</div>
     <h2>Download Prega AI for Android</h2>
