@@ -95,6 +95,47 @@
     background:var(--rose-soft);opacity:0.5;
   }
 
+  /* ---- Hero line art: draw-on + heartbeat ----
+     Each stroke uses pathLength="1" so dash values are normalized and the
+     draw animation needs no measured lengths. Sequence: head → bun → back →
+     seat → chin → belly → underside, then the heart blooms and settles into
+     a slow, calm beat. Everything is CSS-only and fully disabled under
+     prefers-reduced-motion (art shows complete and still). */
+  .mother-art .draw{
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    animation:drawOn 0.9s ease forwards;
+  }
+  .mother-art .d1{animation-delay:0.2s;}
+  .mother-art .d2{animation-delay:0.7s;animation-duration:0.5s;}
+  .mother-art .d3{animation-delay:1.0s;}
+  .mother-art .d4{animation-delay:1.5s;}
+  .mother-art .d5{animation-delay:1.9s;animation-duration:0.5s;}
+  .mother-art .d6{animation-delay:2.2s;}
+  .mother-art .d7{animation-delay:2.7s;animation-duration:0.6s;}
+  .mother-art .heart{
+    opacity:0;
+    transform-box:view-box;
+    transform-origin:60px 114px;
+    animation:
+      heartIn 0.7s ease 3.3s forwards,
+      heartBeat 3.2s ease-in-out 4.2s infinite;
+  }
+  @keyframes drawOn{to{stroke-dashoffset:0;}}
+  @keyframes heartIn{
+    from{opacity:0;transform:scale(0.4);}
+    to{opacity:1;transform:scale(1);}
+  }
+  @keyframes heartBeat{
+    0%,100%{transform:scale(1);}
+    12%{transform:scale(1.09);}
+    24%{transform:scale(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .mother-art .draw{animation:none;stroke-dashoffset:0;}
+    .mother-art .heart{animation:none;opacity:1;}
+  }
+
   /* ---- Sections ---- */
   section{padding:56px 0;}
   .band{background:var(--shell);}
@@ -191,15 +232,23 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-art">
-        <svg viewBox="0 0 200 220" width="100%" style="max-width:180px;">
-          <circle cx="140" cy="45" r="20" fill="none" stroke="#7A6554" stroke-width="4" stroke-linecap="round"/>
-          <circle cx="118" cy="52" r="9" fill="none" stroke="#7A6554" stroke-width="4"/>
-          <path d="M75 45 C67 72 71 100 67 124" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round"/>
-          <path d="M67 124 C64 152 84 168 112 170" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round"/>
-          <path d="M103 47 C109 58 100 65 101 73" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round"/>
-          <path d="M101 73 C140 80 152 116 128 140" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round"/>
-          <path d="M128 140 C113 152 115 158 112 170" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round"/>
-          <path d="M115 106 C108 100 104 96 102 90 C100 84 104 80 108 82 C110 83 111 85 111 85 C111 85 112 83 114 82 C118 80 122 84 120 90 C118 96 122 100 115 106Z" fill="#D87A84"/>
+        <svg class="mother-art" viewBox="0 0 200 220" width="100%" style="max-width:180px;" aria-label="Line drawing of a pregnant mother with a small heart where the baby is">
+          <!-- head: open arc, forward of the body -->
+          <path class="draw d1" d="M100 58 A 19 19 0 1 0 76 55" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- low bun at the nape -->
+          <circle class="draw d2" cx="112" cy="69" r="8" fill="none" stroke="#7A6554" stroke-width="4" pathLength="1"/>
+          <!-- back: one long curve, nape to seat -->
+          <path class="draw d3" d="M104 78 C113 98 122 118 120 140" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- seat rounding forward -->
+          <path class="draw d4" d="M120 140 C118 158 106 166 86 167" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- chin to chest -->
+          <path class="draw d5" d="M72 62 C68 70 71 78 69 85" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- belly -->
+          <path class="draw d6" d="M69 85 C42 94 32 126 47 150" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- belly underside back to the seat -->
+          <path class="draw d7" d="M47 150 C55 160 68 166 86 167" fill="none" stroke="#7A6554" stroke-width="4.5" stroke-linecap="round" pathLength="1"/>
+          <!-- the baby's heart -->
+          <path class="heart" d="M62 128 C54 121 50 116 48 110 C46 103 51 99 55 101 C57 102 58 104 58 104 C58 104 59 102 61 101 C65 99 70 103 68 110 C66 116 70 121 62 128Z" fill="#D87A84"/>
         </svg>
       </div>
       <div class="hero-copy">
