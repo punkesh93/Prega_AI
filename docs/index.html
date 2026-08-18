@@ -166,9 +166,13 @@
   .t-gold{background:#F3E3C4;}
   .t-olive{background:var(--olive-whisper);}
 
-  /* ---- Video (YouTube Short, vertical 9:16) ---- */
+  /* ---- Video (YouTube Shorts, vertical 9:16) ---- */
+  .video-row{
+    display:flex;justify-content:center;align-items:flex-start;
+    gap:24px;flex-wrap:wrap;
+  }
   .video-frame{
-    display:block;margin:0 auto;
+    display:block;
     width:min(320px, 78vw);
     aspect-ratio:9/16;
     border:0;border-radius:26px;
@@ -354,14 +358,30 @@
     <div class="eyebrow-sm">See it in action</div>
     <h2>Watch Prega AI in under a minute</h2>
     <p class="section-lede">A quick look at the app — the garden, the coach, and the daily rhythm.</p>
-    <iframe
-      class="video-frame"
-      src="https://www.youtube-nocookie.com/embed/OH9BmH2xlMo"
-      title="Prega AI — app walkthrough"
-      loading="lazy"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      allowfullscreen
-      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <div class="video-row">
+      <iframe
+        class="video-frame"
+        src="https://www.youtube-nocookie.com/embed/OH9BmH2xlMo"
+        title="Prega AI — app walkthrough"
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <!--
+        SECOND SHORT — link pending from Punkesh. When it arrives, replace
+        VIDEO_ID_HERE with the id from the youtube.com/shorts/<id> URL and
+        uncomment this block; the row already lays two frames side by side
+        on desktop and stacks them on mobile.
+      <iframe
+        class="video-frame"
+        src="https://www.youtube-nocookie.com/embed/VIDEO_ID_HERE"
+        title="Prega AI — second look"
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      -->
+    </div>
   </div>
 </section>
 
@@ -386,17 +406,10 @@
     </div>
 
     <!--
-      SCREENSHOT PLACEHOLDER
-      Punkesh will supply an install-flow screenshot (or a short strip of 2-3).
-      Drop the image file(s) in docs/ (e.g. docs/install-1.png) and replace
-      this figure with:
+      Install-flow screenshot: user decided against the visible placeholder.
+      When/if screenshots arrive, drop the file(s) in docs/ and add here:
         <img src="install-1.png" alt="Installing Prega AI on Android" style="width:100%;border-radius:16px;border:1px solid var(--hairline);">
-      Keep this comment if the screenshot isn't ready yet so the next
-      session knows exactly where it goes.
     -->
-    <div style="border:1.5px dashed var(--hairline);border-radius:16px;padding:32px;text-align:center;color:var(--ink-faint);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:0.85rem;">
-      Installation screenshot coming soon
-    </div>
   </div>
 </section>
 
