@@ -13,6 +13,8 @@ import com.example.ai.PregaPrompts
 import com.example.ai.stripMarkdown
 import com.example.data.*
 import com.example.domain.GamificationEngine
+import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -386,6 +388,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                     )
                 )
                 award(GamificationEngine.Action.KickSession, profile.value?.currentWeek ?: 12, "Kick session saved")
+                AppStats.log(StatEvent.KickSessionCompleted)
             }
         }
     }
@@ -483,6 +486,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
 
             if (result is AiResult.Success) {
                 award(GamificationEngine.Action.AskCoach, week, "Question asked")
+                AppStats.log(StatEvent.CoachQuestionAsked)
             }
         }
     }
@@ -609,6 +613,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             )
             _checkedInToday.value = true
             award(GamificationEngine.Action.JournalEntry, week, "Memory kept")
+            AppStats.log(StatEvent.JournalSaved)
         }
     }
 
@@ -1306,6 +1311,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             val current = profile.value ?: return@launch
             if (current.isPremium == isPremium) return@launch
             repository.saveUserProfile(current.copy(isPremium = isPremium))
+            if (isPremium) AppStats.log(StatEvent.PremiumPurchased)
         }
     }
 

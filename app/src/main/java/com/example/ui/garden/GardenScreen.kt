@@ -649,4 +649,5 @@ private fun shareGarden(
             android.content.Intent.createChooser(intent, "Share your garden")
         )
     }
+    com.example.stats.AppStats.log(com.example.stats.StatEvent.GardenShared)
 }

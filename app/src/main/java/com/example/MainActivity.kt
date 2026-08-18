@@ -27,6 +27,8 @@ import com.example.data.PregnancyDatabase
 import com.example.data.PregnancyRepository
 import com.example.notifications.NotificationChannels
 import com.example.notifications.NotificationScheduler
+import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import com.example.ui.PregnancyApp
 import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.theme.PregaTheme
@@ -66,6 +68,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         NotificationChannels.registerAll(this)
+        AppStats.init(this)
+        AppStats.log(StatEvent.AppOpen)
 
         billing.connect {
             lifecycleScope.launch { billing.loadOffer() }
