@@ -3,11 +3,17 @@ package com.example.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +41,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -123,12 +131,33 @@ fun HomeScreen(
 
         item {
           Reveal(1) {
-            WeekHero(
-                weekInfo = state.weekInfo,
-                babyName = state.profile?.babyNamePlaceholder.orEmpty(),
-                daysRemaining = state.daysRemaining,
-                onClick = onOpenJourney,
-            )
+            // "Little One" living portrait: shown only when the bundled
+            // week image exists (weekNN in drawable-nodpi). Until the image
+            // pack is generated and pushed, or for any missing week, the
+            // classic WeekHero renders instead — the app never blanks.
+            val context = LocalContext.current
+            val weekImageId = remember(state.weekInfo.week) {
+                context.resources.getIdentifier(
+                    "week%02d".format(state.weekInfo.week),
+                    "drawable",
+                    context.packageName,
+                )
+            }
+            if (weekImageId != 0) {
+                LittleOneHero(
+                    imageResId = weekImageId,
+                    weekInfo = state.weekInfo,
+                    babyName = state.profile?.babyNamePlaceholder.orEmpty(),
+                    onClick = onOpenJourney,
+                )
+            } else {
+                WeekHero(
+                    weekInfo = state.weekInfo,
+                    babyName = state.profile?.babyNamePlaceholder.orEmpty(),
+                    daysRemaining = state.daysRemaining,
+                    onClick = onOpenJourney,
+                )
+            }
           }
         }
 
@@ -425,6 +454,111 @@ private fun greetingFor(name: String): String {
  * chip instead of painting the whole card. Gold now appears exactly once on
  * this screen: the affirmation.
  */
+/**
+ * "Little One" — the living portrait hero. A bundled Pixar-style render of
+ * the baby at this week, treated so it feels alive rather than printed:
+ * a very slow Ken Burns drift (scale 1.0->1.05 over 14s), a warm glow that
+ * breathes behind the text scrim, and a few drifting petal motes. Nothing
+ * fast, nothing loud — a window, not a slideshow.
+ *
+ * The image pack lives in drawable-nodpi as week01..week40 (generated once
+ * via the Colab image cell; see repo docs). This composable is only reached
+ * when the current week's resource exists — HomeScreen falls back to the
+ * classic WeekHero otherwise.
+ */
+@Composable
+private fun LittleOneHero(
+    imageResId: Int,
+    weekInfo: WeekInfo,
+    babyName: String,
+    onClick: () -> Unit,
+) {
+    val drift = rememberInfiniteTransition(label = "littleOne")
+    val zoom by drift.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "kenBurns",
+    )
+    val glow by drift.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "glow",
+    )
+
+    PregaCard(
+        onClick = onClick,
+        border = false,
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .clip(MaterialTheme.shapes.large),
+        ) {
+            Image(
+                painter = painterResource(imageResId),
+                contentDescription = "Your baby at week ${weekInfo.week}",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        scaleX = zoom
+                        scaleY = zoom
+                    },
+            )
+            // Breathing warm glow, bottom-anchored, doubles as a text scrim.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.55f to Color.Transparent,
+                            1f to Color(0xFF2B1E14).copy(alpha = 0.55f + glow * 0.2f),
+                        )
+                    ),
+            )
+            PetalDrift(
+                petalCount = 5,
+                tint = Color.White.copy(alpha = 0.35f),
+                modifier = Modifier.matchParentSize(),
+            )
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(Space.lg),
+            ) {
+                Overline("Your little one", color = Color.White.copy(alpha = 0.85f))
+                Spacer(Modifier.height(Space.xs))
+                Text(
+                    "Week ${weekInfo.week}",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(Space.xxs))
+                Text(
+                    if (babyName.isBlank())
+                        "About the size of a ${weekInfo.sizeName.lowercase()} ${weekInfo.iconEmoji}"
+                    else
+                        "$babyName is about the size of a ${weekInfo.sizeName.lowercase()} ${weekInfo.iconEmoji}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.92f),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun WeekHero(
     weekInfo: WeekInfo,
