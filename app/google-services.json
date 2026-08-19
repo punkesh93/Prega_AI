@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "538049038294",
+    "project_id": "prega-ai",
+    "storage_bucket": "prega-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:538049038294:android:c8a116269bf419b5e50677",
+        "android_client_info": {
+          "package_name": "com.pregaai.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeUzbXEKBnm8MZ5IzE7A1kMCAhPwRStfE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

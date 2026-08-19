@@ -28,7 +28,6 @@ import com.example.data.PregnancyRepository
 import com.example.notifications.NotificationChannels
 import com.example.notifications.NotificationScheduler
 import com.example.stats.AppStats
-import com.example.stats.StatEvent
 import com.example.ui.PregnancyApp
 import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.theme.PregaTheme
@@ -68,8 +67,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         NotificationChannels.registerAll(this)
+        // app_open itself is auto-collected by Firebase Analytics; init only
+        // prepares the client for the feature events.
         AppStats.init(this)
-        AppStats.log(StatEvent.AppOpen)
 
         billing.connect {
             lifecycleScope.launch { billing.loadOffer() }
