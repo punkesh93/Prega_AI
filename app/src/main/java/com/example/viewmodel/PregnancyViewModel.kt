@@ -443,6 +443,11 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 history = history,
                 model = PregaModel.Conversational,
                 temperature = 0.7,
+                // 70-word replies never need 1200 tokens; a tight budget also
+                // shortens free-tier queue time — the "AI lags" complaint is
+                // largely the 550B free pool under load, and smaller
+                // reservations get scheduled sooner.
+                maxTokens = 320,
             )
 
             val reply = when (result) {

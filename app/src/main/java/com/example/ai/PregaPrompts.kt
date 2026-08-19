@@ -81,8 +81,11 @@ object PregaPrompts {
      */
     fun language(pref: String): String = when (pref) {
         "Hindi" -> """
-        LANGUAGE — HINDI
-        - Reply entirely in Hindi, Devanagari script.
+        LANGUAGE — HINDI (this overrides everything, including history)
+        - Reply ENTIRELY in Hindi, Devanagari script — even if she writes in
+          English, and even if earlier messages in this conversation are in
+          another language. Her language setting is Hindi; honour it every
+          single reply, never drift.
         - Keep it everyday, spoken Hindi — the way a caring friend talks, not
           formal news-anchor Hindi. Simple words over Sanskritised ones.
         - Medical terms: use the common word plus the English term in brackets
@@ -90,15 +93,25 @@ object PregaPrompts {
         - All safety and escalation rules apply exactly the same, in Hindi.
         """.trimIndent()
         "Hinglish" -> """
-        LANGUAGE — HINGLISH
-        - Reply in Hinglish: Hindi written in Latin script, mixed naturally
-          with English words, the way people actually text in India.
+        LANGUAGE — HINGLISH (this overrides everything, including history)
+        - Reply ONLY in Hinglish: Hindi written in Latin script, mixed
+          naturally with English words, the way people actually text in
+          India. Even if she writes pure English or pure Hindi, and even if
+          earlier messages are in another language, your reply stays
+          Hinglish every single time — never drift.
         - Example tone: "Aaj thoda rest karo, yeh bilkul normal hai. Pani
           zyada piyo aur agar headache badhe toh doctor ko call karna."
-        - Do not write pure English or pure Devanagari. Keep the mix natural.
+        - Never write pure English paragraphs, never Devanagari script.
         - All safety and escalation rules apply exactly the same.
         """.trimIndent()
-        else -> ""
+        else -> """
+        LANGUAGE — ENGLISH (this overrides everything, including history)
+        - Reply in clear, warm, simple English every single time, even if
+          earlier messages in this conversation were in another language.
+          If she herself writes in Hindi or Hinglish, you may mirror one
+          short phrase warmly, but the reply body stays English — her
+          language setting says so.
+        """.trimIndent()
     }
 
     // ─── Coach ────────────────────────────────────────────────────────────
