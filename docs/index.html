@@ -149,6 +149,54 @@
   .section-lede{color:var(--ink-muted);margin:0 0 32px;max-width:56ch;}
 
   .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .t-lav{background:#E7E2F2;}
+
+  /* ---- Scroll reveal: cards drift up as they enter the viewport ---- */
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in{opacity:1;transform:none;}
+  /* Gentle stagger inside a row */
+  .cards .reveal:nth-child(3n+2){transition-delay:.08s;}
+  .cards .reveal:nth-child(3n+3){transition-delay:.16s;}
+
+  /* ---- Micro-animated card icons: one quiet loop each, nothing bounces ---- */
+  @keyframes sparkleTwinkle{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.12);opacity:.85;}}
+  .anim-sparkle{animation:sparkleTwinkle 2.8s ease-in-out infinite;}
+  @keyframes softPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}
+  .anim-pulse{animation:softPulse 2.4s ease-in-out infinite;}
+  @keyframes gentleSway{0%,100%{transform:rotate(-4deg);}50%{transform:rotate(4deg);}}
+  .anim-sway{animation:gentleSway 3.6s ease-in-out infinite;transform-origin:50% 90%;}
+  @keyframes heartBeatIcon{0%,100%{transform:scale(1);}10%{transform:scale(1.14);}20%{transform:scale(1);}}
+  .anim-heartbeat{animation:heartBeatIcon 3.2s ease-in-out infinite;}
+  @keyframes tinyKick{0%,88%,100%{transform:translateX(0) rotate(0);}92%{transform:translateX(3px) rotate(6deg);}96%{transform:translateX(-1px) rotate(-3deg);}}
+  .anim-kick{animation:tinyKick 4.5s ease-in-out infinite;}
+  @keyframes stepBob{0%,100%{transform:translateY(0);}25%{transform:translateY(-3px) rotate(-3deg);}75%{transform:translateY(-3px) rotate(3deg);}}
+  .anim-step{animation:stepBob 1.9s ease-in-out infinite;}
+  @keyframes floatDrift{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+  .anim-float{animation:floatDrift 3.4s ease-in-out infinite;}
+  @keyframes lockSettle{0%,90%,100%{transform:rotate(0);}94%{transform:rotate(-6deg);}97%{transform:rotate(4deg);}}
+  .anim-lock{animation:lockSettle 5.5s ease-in-out infinite;}
+
+  /* ---- Language chips inside the coach card: highlight cycles EN → हिंदी → Hinglish ---- */
+  .lang-chips{display:flex;gap:8px;margin-top:14px;}
+  .lang-chips span{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    font-size:0.72rem;color:var(--ink-muted);
+    border:1px solid var(--hairline);border-radius:999px;padding:4px 12px;
+    animation:chipCycle 6s infinite;
+  }
+  .lang-chips span:nth-child(1){animation-delay:0s;}
+  .lang-chips span:nth-child(2){animation-delay:2s;}
+  .lang-chips span:nth-child(3){animation-delay:4s;}
+  @keyframes chipCycle{
+    0%,30%,100%{background:transparent;color:var(--ink-muted);border-color:var(--hairline);}
+    6%,24%{background:var(--olive);color:#FFFFFF;border-color:var(--olive);}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .reveal{opacity:1;transform:none;transition:none;}
+    .anim-sparkle,.anim-pulse,.anim-sway,.anim-heartbeat,.anim-kick,.anim-step,.anim-float,.anim-lock,
+    .lang-chips span{animation:none;}
+  }
   .card{
     background:var(--card);border:1px solid var(--hairline);
     border-radius:22px;padding:24px 20px;
@@ -341,20 +389,46 @@
     <h2>Built around the whole nine months</h2>
     <p class="section-lede">Prega AI is a local-first pregnancy companion — every log, photo, and note is stored only on your device.</p>
     <div class="cards">
-      <div class="card">
-        <div class="tint t-rose">🌱</div>
-        <h3>Your journey, week by week</h3>
-        <p>Baby's size and development, and what you might be feeling — with a gentle note on what helps, and why.</p>
+      <div class="card reveal">
+        <div class="tint t-gold anim-sparkle">✨</div>
+        <h3>An AI coach with no question limit</h3>
+        <p>Ask as much as you like, day or night. It asks the right follow-up before answering — like a well-informed friend, not a chatbot — with hard boundaries around anything that needs a real midwife.</p>
+        <div class="lang-chips" aria-hidden="true"><span>English</span><span>हिंदी</span><span>Hinglish</span></div>
       </div>
-      <div class="card">
-        <div class="tint t-gold">✨</div>
-        <h3>An AI coach that knows when to step back</h3>
-        <p>Plain-language answers to everyday questions, with hard boundaries around anything that needs a real midwife.</p>
+      <div class="card reveal">
+        <div class="tint t-lav anim-pulse">🎙️</div>
+        <h3>Speak it, hear it</h3>
+        <p>Tap the mic and ask out loud in Hindi or English. Tap "Listen" on any reply, insight, or affirmation and it's read to you in a natural voice — for the 3am moments when reading feels like work.</p>
       </div>
-      <div class="card">
-        <div class="tint t-olive">🌷</div>
+      <div class="card reveal">
+        <div class="tint t-olive anim-sway">🌷</div>
         <h3>A garden that only ever grows</h3>
-        <p>Every day of care blooms a flower. It never wilts, never resets — a quiet record of showing up for yourself.</p>
+        <p>Every day of care blooms a flower. It never wilts, never resets. Birdsong, a soft breeze, and footsteps on a distant path play while you're there — and little visitors move in as you keep showing up.</p>
+      </div>
+      <div class="card reveal">
+        <div class="tint t-rose anim-heartbeat">🤍</div>
+        <h3>A day with a gentle rhythm</h3>
+        <p>A fresh insight for your exact week, one affirmation, three small quests, and a mood check-in that responds in colour — never a streak to lose, never a red number.</p>
+      </div>
+      <div class="card reveal">
+        <div class="tint t-rose anim-kick">👣</div>
+        <h3>Kicks, counted calmly</h3>
+        <p>A one-thumb kick counter with your baby's history kept on your phone — because you know their rhythm better than anyone.</p>
+      </div>
+      <div class="card reveal">
+        <div class="tint t-olive anim-step">👟</div>
+        <h3>Walks that bloom flowers</h3>
+        <p>A soft 4,000-step goal read straight from your phone's own counter. Reaching it grows your garden — a celebration, not a demand.</p>
+      </div>
+      <div class="card reveal">
+        <div class="tint t-lav anim-float">📸</div>
+        <h3>A journal that writes with you</h3>
+        <p>A photo, a mood, a line a day. When you leave the caption blank, the AI writes one that matches your day — honest on the hard ones, never forced sunshine.</p>
+      </div>
+      <div class="card reveal">
+        <div class="tint t-gold anim-lock">🔒</div>
+        <h3>Private by design</h3>
+        <p>No account. No cloud copy of your data. Everything you log lives on your device, and "Delete everything" means exactly that.</p>
       </div>
     </div>
   </div>
@@ -481,5 +555,26 @@
   </div>
 </footer>
 
+<script>
+// Scroll reveal — adds .in the first time an element enters the viewport.
+// No library, ~10 lines, and prefers-reduced-motion users see everything
+// immediately via the CSS override (transition:none there).
+(function () {
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    els.forEach(function (e) { e.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) {
+        en.target.classList.add('in');
+        io.unobserve(en.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (e) { io.observe(e); });
+})();
+</script>
 </body>
 </html>
