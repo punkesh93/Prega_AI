@@ -117,7 +117,17 @@ dependencies {
   implementation(libs.firebase.ai)
   implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.firebase.analytics)
-  implementation(libs.firebase.crashlytics)
+  // Crashlytics SDK deliberately NOT included yet. It ships without its
+  // Gradle plugin applied (that part was correctly deferred for AGP-9.1.1
+  // compat — see the plugins block above), but the bare SDK still
+  // auto-initializes via a manifest-merged ContentProvider on EVERY cold
+  // start, before any app code runs. On a device where that init throws
+  // (missing/stale Google Play services, a malformed build-id resource
+  // from the absent plugin, etc.) the result is an install-crash loop
+  // that survives uninstall+reinstall — exactly the symptom reported.
+  // Re-add together with the Crashlytics Gradle plugin at release-prep,
+  // tested on a real device before it ships to anyone else.
+  // implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.firestore)
   implementation(libs.kotlinx.coroutines.play.services)
