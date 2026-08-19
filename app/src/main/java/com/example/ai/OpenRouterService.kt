@@ -267,8 +267,28 @@ fun String.stripMarkdown(): String {
  * 2. Vocabulary collapse: in a long response (30+ words), fewer than 25%
  *    distinct words. Normal English sits well above 40% even in
  *    repetitive instructional text.
+ * 3. Model-internal special tokens (<pad>, <unk>, <|im_end|>, [PAD]...)
+ *    leaking into the text 3+ times. Seen in production: an affirmation
+ *    rendered as "<pad><pad><pad>..." — these tokens never belong in
+ *    prose for a mother.
+ * 4. Whitespace-free loops: any 3–24 char chunk repeated 4+ times
+ *    back-to-back. Catches the same failure as (1) when the loop has no
+ *    spaces, which made it invisible to word-level checks.
  */
+private val SPECIAL_TOKEN_REGEX = Regex(
+    """<\|[^|>]{1,30}\|>|</?(?:pad|unk|eos|bos|mask)>|\[(?:PAD|UNK|CLS|SEP|MASK)]""",
+    RegexOption.IGNORE_CASE,
+)
+
+private val CHUNK_LOOP_REGEX = Regex("""(\S{3,24})\1{3,}""")
+
 fun String.isDegenerate(): Boolean {
+    // 3. Special-token leakage — three or more is unambiguous garbage
+    if (SPECIAL_TOKEN_REGEX.findAll(this).count() >= 3) return true
+
+    // 4. Repeated chunk with no whitespace (e.g. "<pad><pad><pad>...")
+    if (CHUNK_LOOP_REGEX.containsMatchIn(this)) return true
+
     val words = trim().lowercase().split(Regex("""\s+""")).filter { it.isNotBlank() }
     if (words.size < 10) return false
 

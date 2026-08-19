@@ -1,5 +1,11 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -101,90 +107,121 @@ fun LeafSprig(
 }
 
 /**
- * Abstract line-art mother, side profile: an open head arc, a low bun, one
- * back curve, and a generous belly sweep with a small heart where the baby
- * is. Six curves total — the references' single-line hand-drawn language,
- * not anatomy.
+ * Abstract line-art mother, side profile: an open head arc, a low bun at the
+ * nape, one long back curve to the seat, a chin-to-chest step, and a full
+ * round belly with a small heart where the baby is.
  *
- * The exact control points were prototyped as raster renders and visually
- * judged across two iterations before landing here (v1's belly was too
- * small to read "pregnant"; v2 fixed it). Draw at 160dp+ on cream; [line]
- * defaults to warm umber, the heart to rose.
+ * Second-generation geometry (2026-08): the original app curves had drifted
+ * — floating head, colliding bun (user screenshot) — so this is the refined
+ * figure designed for the website hero, ported 1:1. Control points live in
+ * the same 200x220 art space as the website SVG (docs/index.html) so the two
+ * stay in lockstep; the space is uniformly mapped into the canvas square.
+ * The port was verified the standard way: the exact draw calls simulated as
+ * a raster render and visually inspected before landing (which caught a
+ * mis-copied bun coordinate and an oversized heart on the first pass).
+ *
+ * The head arc's center/angles were derived numerically from the SVG arc
+ * "M100 58 A19 19 0 1 0 76 55": center (89.82, 41.96), start 57.6°, sweep
+ * -280.9° (counter-clockwise), leaving the gap at the lower back for the bun.
+ *
+ * [pulseHeart] gives the baby's heart a slow, calm beat — scale 1→1.06 over
+ * ~2.6s, nothing bouncy. Pass false for static contexts.
  */
 @Composable
 fun MotherLineArt(
     modifier: Modifier = Modifier,
     line: Color = Color(0xFF7A6554),
     heart: Color = Color(0xFFD87A84),
+    pulseHeart: Boolean = true,
 ) {
+    val heartScale = if (pulseHeart) {
+        val transition = rememberInfiniteTransition(label = "motherHeart")
+        transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.06f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "motherHeartScale",
+        ).value
+    } else 1f
+
     Canvas(modifier) {
         val s = size.minDimension
         val ox = (size.width - s) / 2f
         val oy = (size.height - s) / 2f
-        fun p(x: Float, y: Float) = Offset(ox + x * s, oy + y * s)
-        val stroke = Stroke(width = (s * 0.019f).coerceAtLeast(3f), cap = StrokeCap.Round)
+        // Uniform map of the shared 200x220 art space into the canvas square,
+        // content centred (art-space centroid ~ (81, 95)).
+        val k = s / 220f
+        fun p(x: Float, y: Float) = Offset(ox + (0.5f - 81f / 220f) * s + x * k,
+                                           oy + (0.5f - 95f / 220f) * s + y * k)
+        val stroke = Stroke(width = (s * 0.021f).coerceAtLeast(3f), cap = StrokeCap.Round)
 
-        // Head: open arc facing right, gap at the chin-front.
-        val headC = p(0.46f, 0.14f)
-        val r = 0.095f * s
+        // Head: open arc, gap at the lower back where the bun sits.
+        val headC = p(89.82f, 41.96f)
+        val r = 19f * k
         drawArc(
             color = line,
-            startAngle = -60f,
-            sweepAngle = 295f,
+            startAngle = 57.6f,
+            sweepAngle = -280.9f,
             useCenter = false,
             topLeft = Offset(headC.x - r, headC.y - r),
             size = androidx.compose.ui.geometry.Size(2 * r, 2 * r),
             style = stroke,
         )
-        // Low bun nestled at the back of the head.
-        val bunC = Offset(headC.x - r * 1.12f, headC.y + r * 0.15f)
-        val br = r * 0.38f
-        drawCircle(color = line, radius = br, center = bunC, style = stroke)
+        // Low bun at the nape.
+        drawCircle(
+            color = line,
+            radius = 8f * k,
+            center = p(112f, 69f),
+            style = Stroke(width = stroke.width * 0.9f, cap = StrokeCap.Round),
+        )
 
-        // Back: nape flowing down, then the seat curve forward.
+        // Back: one long curve, nape to seat, then rounding forward.
         drawPath(
             Path().apply {
-                moveTo(p(0.375f, 0.225f).x, p(0.375f, 0.225f).y)
+                moveTo(p(104f, 78f).x, p(104f, 78f).y)
                 cubicTo(
-                    p(0.335f, 0.36f).x, p(0.335f, 0.36f).y,
-                    p(0.355f, 0.50f).x, p(0.355f, 0.50f).y,
-                    p(0.335f, 0.62f).x, p(0.335f, 0.62f).y,
+                    p(113f, 98f).x, p(113f, 98f).y,
+                    p(122f, 118f).x, p(122f, 118f).y,
+                    p(120f, 140f).x, p(120f, 140f).y,
                 )
                 cubicTo(
-                    p(0.32f, 0.76f).x, p(0.32f, 0.76f).y,
-                    p(0.42f, 0.84f).x, p(0.42f, 0.84f).y,
-                    p(0.56f, 0.85f).x, p(0.56f, 0.85f).y,
+                    p(118f, 158f).x, p(118f, 158f).y,
+                    p(106f, 166f).x, p(106f, 166f).y,
+                    p(86f, 167f).x, p(86f, 167f).y,
                 )
             },
             color = line, style = stroke,
         )
 
-        // Front: chin -> chest dip -> the belly sweep -> under-belly.
+        // Front: chin -> chest, then the belly sweep, then under to the seat.
         drawPath(
             Path().apply {
-                moveTo(p(0.515f, 0.235f).x, p(0.515f, 0.235f).y)
+                moveTo(p(72f, 62f).x, p(72f, 62f).y)
                 cubicTo(
-                    p(0.545f, 0.29f).x, p(0.545f, 0.29f).y,
-                    p(0.50f, 0.325f).x, p(0.50f, 0.325f).y,
-                    p(0.505f, 0.365f).x, p(0.505f, 0.365f).y,
+                    p(68f, 70f).x, p(68f, 70f).y,
+                    p(71f, 78f).x, p(71f, 78f).y,
+                    p(69f, 85f).x, p(69f, 85f).y,
                 )
                 cubicTo(
-                    p(0.70f, 0.40f).x, p(0.70f, 0.40f).y,
-                    p(0.76f, 0.58f).x, p(0.76f, 0.58f).y,
-                    p(0.63f, 0.70f).x, p(0.63f, 0.70f).y,
+                    p(42f, 94f).x, p(42f, 94f).y,
+                    p(32f, 126f).x, p(32f, 126f).y,
+                    p(47f, 150f).x, p(47f, 150f).y,
                 )
                 cubicTo(
-                    p(0.565f, 0.76f).x, p(0.565f, 0.76f).y,
-                    p(0.575f, 0.79f).x, p(0.575f, 0.79f).y,
-                    p(0.56f, 0.85f).x, p(0.56f, 0.85f).y,
+                    p(55f, 160f).x, p(55f, 160f).y,
+                    p(68f, 166f).x, p(68f, 166f).y,
+                    p(86f, 167f).x, p(86f, 167f).y,
                 )
             },
             color = line, style = stroke,
         )
 
-        // The baby: a small filled heart inside the bump.
-        val h = p(0.615f, 0.53f)
-        val hs = 0.036f * s
+        // The baby: a small filled heart centred in the bump, gently beating.
+        val h = p(61f, 114.5f)
+        val hs = 13f * k * heartScale
         val heartPath = Path()
         for (i in 0..59) {
             val t = i / 59f * 2f * Math.PI.toFloat()

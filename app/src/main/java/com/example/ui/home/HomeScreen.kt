@@ -603,7 +603,9 @@ private fun InsightCard(insight: String?, onOpenCoach: () -> Unit) {
                         style = MaterialTheme.typography.bodyLarge,
                         color = PregaTheme.colors.ink,
                     )
-                    Spacer(Modifier.height(Space.md))
+                    Spacer(Modifier.height(Space.sm))
+                    ListenChip(insight)
+                    Spacer(Modifier.height(Space.sm))
                     Text(
                         "Ask me anything →",
                         style = MaterialTheme.typography.labelMedium,
@@ -645,6 +647,10 @@ private fun AffirmationCard(text: String) {
             style = MaterialTheme.typography.headlineSmall,
             color = Color.White,
         )
+        Spacer(Modifier.height(Space.sm))
+        // White-tinted listen chip — the one place the default faint ink
+        // would vanish against the gold.
+        ListenChip(text, tint = Color.White.copy(alpha = 0.85f))
         }
       }
     }

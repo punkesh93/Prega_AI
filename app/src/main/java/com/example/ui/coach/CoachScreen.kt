@@ -150,29 +150,35 @@ private fun MessageBubble(message: ChatMessage) {
             Spacer(Modifier.width(Space.sm))
         }
 
-        Box(
-            Modifier
-                .widthIn(max = 300.dp)
-                .clip(
-                    // Asymmetric corners so the bubble points at its speaker.
-                    RoundedCornerShape(
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomStart = if (isUser) 20.dp else 6.dp,
-                        bottomEnd = if (isUser) 6.dp else 20.dp,
+        Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+            Box(
+                Modifier
+                    .widthIn(max = 300.dp)
+                    .clip(
+                        // Asymmetric corners so the bubble points at its speaker.
+                        RoundedCornerShape(
+                            topStart = 20.dp,
+                            topEnd = 20.dp,
+                            bottomStart = if (isUser) 20.dp else 6.dp,
+                            bottomEnd = if (isUser) 6.dp else 20.dp,
+                        )
                     )
+                    .background(
+                        if (isUser) MaterialTheme.colorScheme.primary
+                        else PregaTheme.colors.cardSurface
+                    )
+                    .padding(horizontal = Space.lg, vertical = Space.md),
+            ) {
+                Text(
+                    message.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isUser) Color.White else PregaTheme.colors.ink,
                 )
-                .background(
-                    if (isUser) MaterialTheme.colorScheme.primary
-                    else PregaTheme.colors.cardSurface
-                )
-                .padding(horizontal = Space.lg, vertical = Space.md),
-        ) {
-            Text(
-                message.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isUser) Color.White else PregaTheme.colors.ink,
-            )
+            }
+            // "Read it to me" — coach replies only, tucked under the bubble.
+            if (!isUser) {
+                ListenChip(message.text)
+            }
         }
     }
 }

@@ -23,6 +23,45 @@ class DegenerateOutputTest {
     }
 
     @Test
+    fun `pad token garbage without whitespace is flagged`() {
+        // Second production bug: an affirmation rendered as one unbroken
+        // run of <pad> tokens — no spaces, so word-level checks were blind.
+        assertTrue(("\u201C" + "<pad>".repeat(40) + "\u201D").isDegenerate())
+    }
+
+    @Test
+    fun `pad tokens with spaces are flagged`() {
+        assertTrue("<pad> ".repeat(12).isDegenerate())
+    }
+
+    @Test
+    fun `chat template token spam is flagged`() {
+        assertTrue("<|im_end|><|im_end|><|im_end|> something".isDegenerate())
+    }
+
+    @Test
+    fun `whitespace-free character loop is flagged`() {
+        assertTrue("okayokayokayokayokay fine".isDegenerate())
+    }
+
+    @Test
+    fun `one special token mentioned in an explanation is clean`() {
+        assertFalse(
+            "The token pad, written as <pad>, is used by AI models to fill space."
+                .isDegenerate()
+        )
+    }
+
+    @Test
+    fun `laughter and ellipses are clean`() {
+        assertFalse(
+            "hahahaha that made me smile, thank you for asking about the baby today"
+                .isDegenerate()
+        )
+        assertFalse("Rest today... you have earned it... truly.".isDegenerate())
+    }
+
+    @Test
     fun `single word loop is flagged`() {
         assertTrue("baby ".repeat(20).isDegenerate())
     }
