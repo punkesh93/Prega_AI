@@ -94,7 +94,9 @@ fun CommunityScreen(
 
         when {
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Breathing()
+                Breathing {
+                    Text("🌸", fontSize = 28.sp)
+                }
             }
             profile == null -> JoinCard(dueDate) { handle ->
                 scope.launch {
