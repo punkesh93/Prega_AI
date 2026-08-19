@@ -689,11 +689,21 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         "I trust myself to notice what matters.",
     )
 
+    // Same-process, same-day guards: reopening the app used to re-generate
+    // the insight AND affirmation every single launch — two AI calls that
+    // return essentially the same daily content. On OpenRouter's free tier
+    // (50 req/day without credits) that's how one afternoon of testing
+    // exhausts the whole day's quota. Only SUCCESSFUL generations set the
+    // guard, so a failed/fallback day retries on next launch.
+    private var affirmationDay: String? = null
+    private var insightDay: String? = null
+
     fun refreshDailyAffirmation() {
+        if (affirmationDay == _todayDate.value && _dailyAffirmation.value != null) return
         viewModelScope.launch {
             val p = profile.value ?: return@launch
             val week = p.currentWeek
-            _dailyAffirmation.value = OpenRouterClient.completeOrNull(
+            val generated = OpenRouterClient.completeOrNull(
                 systemPrompt = PregaPrompts.dailyAffirmation(
                     week = week,
                     trimester = trimesterFor(week),
@@ -704,7 +714,9 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 model = PregaModel.Quick,
                 temperature = 0.7,
                 maxTokens = 60,
-            )?.stripMarkdown() ?: FALLBACK_AFFIRMATIONS[
+            )?.stripMarkdown()
+            if (generated != null) affirmationDay = _todayDate.value
+            _dailyAffirmation.value = generated ?: FALLBACK_AFFIRMATIONS[
                 // Stable per-day pick, so it doesn't change on every recomposition.
                 (_todayDate.value.hashCode().let { if (it < 0) -it else it }) % FALLBACK_AFFIRMATIONS.size
             ]
@@ -751,10 +763,11 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
      * consecutive days never read the same.
      */
     fun refreshDailyInsight() {
+        if (insightDay == _todayDate.value && _dailyInsight.value != null) return
         viewModelScope.launch {
             val p = profile.value ?: return@launch
             val week = p.currentWeek
-            _dailyInsight.value = OpenRouterClient.completeOrNull(
+            val generated = OpenRouterClient.completeOrNull(
                 systemPrompt = PregaPrompts.dailyInsight(
                     week = week,
                     trimester = trimesterFor(week),
@@ -768,7 +781,9 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 // came from this path. 0.7 keeps variety with less chaos.
                 temperature = 0.7,
                 maxTokens = 120,
-            )?.stripMarkdown() ?: fallbackInsight(week)
+            )?.stripMarkdown()
+            if (generated != null) insightDay = _todayDate.value
+            _dailyInsight.value = generated ?: fallbackInsight(week)
         }
     }
 
