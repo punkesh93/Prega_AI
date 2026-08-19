@@ -1,8 +1,12 @@
 package com.example.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,7 +22,6 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
@@ -862,12 +866,41 @@ private fun QuickLog(
 
         Spacer(Modifier.height(Space.md))
 
-        PregaCard {
-            Text(
-                "How are you feeling?",
-                style = MaterialTheme.typography.titleMedium,
-                color = PregaTheme.colors.ink,
-            )
+        // "How are you feeling?" — modernized: the card itself takes on the
+        // colour of her chosen mood, the title becomes a soft acknowledgement,
+        // and the picked face springs forward with a glow. One tap still does
+        // everything; the redesign is entirely in how it responds.
+        val moodTints = listOf(
+            PregaTheme.colors.terracottaSoft,  // rough
+            PregaTheme.colors.goldSoft,        // low
+            PregaTheme.colors.lavenderSoft,    // okay
+            PregaTheme.colors.sageSoft,        // good
+            PregaTheme.colors.successSoft,     // great
+        )
+        val selectedIndex = mood?.mood?.minus(1)
+        val cardTint by animateColorAsState(
+            targetValue = selectedIndex?.let { moodTints[it % moodTints.size] }
+                ?: PregaTheme.colors.cardSurface,
+            animationSpec = tween(500),
+            label = "moodCardTint",
+        )
+
+        PregaCard(containerColor = cardTint, border = selectedIndex == null) {
+            Crossfade(targetState = selectedIndex, label = "moodTitle") { sel ->
+                if (sel == null) {
+                    Text(
+                        "How are you feeling?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                } else {
+                    Text(
+                        "Feeling ${MOODS[sel].second.lowercase()} today — noted 🌸",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PregaTheme.colors.ink,
+                    )
+                }
+            }
             Spacer(Modifier.height(Space.md))
             Row(
                 Modifier.fillMaxWidth(),
@@ -923,6 +956,17 @@ private fun MoodOption(
         animationSpec = Motion.playful(),
         label = "moodRing",
     )
+    // The chosen face springs forward — a small, alive moment, not a bounce
+    // house. Unselected faces step back slightly so the choice reads at a
+    // glance even before the ring lands.
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.18f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "moodScale",
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -931,22 +975,45 @@ private fun MoodOption(
             .clickable(onClick = onClick)
             .padding(horizontal = Space.xs, vertical = Space.sm),
     ) {
-        Box(
-            Modifier
-                .size(46.dp)
-                .then(
-                    if (ring > 0f) Modifier.border(
-                        width = (2 * ring).dp,
-                        color = PregaTheme.colors.sage,
-                        shape = CircleShape,
-                    ) else Modifier
+        Box(contentAlignment = Alignment.Center) {
+            // Soft radial glow behind the chosen face.
+            if (ring > 0f) {
+                Box(
+                    Modifier
+                        .size(58.dp)
+                        .graphicsLayer { alpha = ring * 0.8f }
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    circleTints[index % circleTints.size],
+                                    Color.Transparent,
+                                ),
+                            ),
+                            shape = CircleShape,
+                        ),
                 )
-                .padding((3 * ring).dp)
-                .clip(CircleShape)
-                .background(circleTints[index % circleTints.size]),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(emoji, fontSize = 20.sp)
+            }
+            Box(
+                Modifier
+                    .size(46.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .then(
+                        if (ring > 0f) Modifier.border(
+                            width = (2 * ring).dp,
+                            color = PregaTheme.colors.sage,
+                            shape = CircleShape,
+                        ) else Modifier
+                    )
+                    .padding((3 * ring).dp)
+                    .clip(CircleShape)
+                    .background(circleTints[index % circleTints.size]),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(emoji, fontSize = 20.sp)
+            }
         }
         Spacer(Modifier.height(Space.xs))
         Text(

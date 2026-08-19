@@ -419,41 +419,11 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             val week = currentProfile?.currentWeek ?: 12
             val trimester = trimesterFor(week)
 
-            // Free-tier gate. Premium is granted only by the billing client.
-            if (currentProfile != null && !currentProfile.isPremium) {
-                val today = _todayDate.value
-
-                // Daily top-up: 5 questions PER DAY, not 5 ever. Without this
-                // check, freeQuestionsRemaining only ever counted down and a
-                // free user who used her 5 questions once was locked out of
-                // Prega AI for good.
-                val profileForToday = if (currentProfile.lastQuestionResetDate != today) {
-                    currentProfile.copy(
-                        freeQuestionsRemaining = 5,
-                        lastQuestionResetDate = today,
-                    )
-                } else {
-                    currentProfile
-                }
-
-                if (profileForToday.freeQuestionsRemaining <= 0) {
-                    if (profileForToday !== currentProfile) repository.saveUserProfile(profileForToday)
-                    _chatMessages.value = _chatMessages.value + ChatMessage(
-                        text = "You've used today's free questions. They'll top back up " +
-                            "tomorrow, or Premium unlocks unlimited questions, weekly meal " +
-                            "plans tailored to how you're actually feeling, and your full " +
-                            "kick history.",
-                        isUser = false,
-                    )
-                    _chatLoading.value = false
-                    return@launch
-                }
-                repository.saveUserProfile(
-                    profileForToday.copy(
-                        freeQuestionsRemaining = profileForToday.freeQuestionsRemaining - 1
-                    )
-                )
-            }
+            // Chat is unlimited for everyone: the coach runs on a free-tier
+            // model, so a per-question cap protects nothing. The old 5/day
+            // gate (and its DB fields) stays dormant in the schema in case a
+            // paid model ever returns. Premium now differentiates on meal
+            // plans, kick history, and future voice features instead.
 
             // Real conversation history, so follow-up questions actually work.
             val history = _chatMessages.value
@@ -467,6 +437,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                     trimester = trimester,
                     babyName = currentProfile?.babyNamePlaceholder.orEmpty(),
                     name = currentProfile?.name.orEmpty(),
+                    chatLanguage = currentProfile?.chatLanguage ?: "English",
                 ),
                 userPrompt = question,
                 history = history,
@@ -497,6 +468,64 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
         "Everything else in the app works offline: your logs, kick counter, " +
         "quests and journey are all saved on your device.\n\n" +
         "For anything that worries you, your midwife or OB-GYN is the right call."
+
+    // ─── Chat language + dynamic suggested questions ───────────────────────
+
+    fun setChatLanguage(lang: String) {
+        viewModelScope.launch {
+            val current = profile.value ?: return@launch
+            if (current.chatLanguage == lang) return@launch
+            repository.saveUserProfile(current.copy(chatLanguage = lang))
+            refreshSuggestedQuestions(force = true)
+        }
+    }
+
+    private val _suggestedQuestions = MutableStateFlow<List<String>>(emptyList())
+    /** AI-written, week+language-specific chips for the empty chat screen.
+     *  Empty list = generation unavailable; the UI falls back to its static
+     *  English set. */
+    val suggestedQuestions: StateFlow<List<String>> = _suggestedQuestions.asStateFlow()
+
+    private var suggestionsKey: String? = null
+
+    /**
+     * Regenerates the chips when week or language changes (or on demand).
+     * Every failure path lands on emptyList — never stale wrong-language
+     * chips, never a crash; the static English fallback covers the gap.
+     */
+    fun refreshSuggestedQuestions(force: Boolean = false) {
+        viewModelScope.launch {
+            val p = profile.value ?: return@launch
+            val key = "${p.currentWeek}|${p.chatLanguage}"
+            if (!force && key == suggestionsKey) return@launch
+            suggestionsKey = key
+
+            val raw = OpenRouterClient.completeOrNull(
+                systemPrompt = PregaPrompts.suggestedQuestions(
+                    week = p.currentWeek,
+                    trimester = trimesterFor(p.currentWeek),
+                    babyName = p.babyNamePlaceholder,
+                    name = p.name,
+                    chatLanguage = p.chatLanguage,
+                ),
+                userPrompt = "Give me this week's 4 questions.",
+                model = PregaModel.Quick,
+                temperature = 0.7,
+                maxTokens = 140,
+            )?.stripMarkdown()
+
+            _suggestedQuestions.value = raw
+                ?.lines()
+                ?.map { it.trim().trimStart('-', '•', '*', ' ').trim() }
+                // Strip any "1." / "2)" numbering the model sneaks in.
+                ?.map { it.replace(Regex("""^\d+[.)]\s*"""), "") }
+                ?.filter { it.length in 8..90 }
+                ?.distinct()
+                ?.take(4)
+                ?.takeIf { it.size >= 2 }
+                ?: emptyList()
+        }
+    }
 
     // --- AI Weekly Meal Plan ---
     private val _weeklyMealPlan = MutableStateFlow<String?>(null)

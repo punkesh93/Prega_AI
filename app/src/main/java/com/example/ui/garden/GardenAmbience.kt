@@ -27,6 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.R
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
@@ -66,25 +69,42 @@ fun GardenAmbience() {
     }
 
     if (soundOn) {
-        DisposableEffect(Unit) {
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
             val players = mutableListOf<MediaPlayer>()
-            try {
-                MediaPlayer.create(context, R.raw.garden_wind)?.let {
-                    it.isLooping = true
-                    it.setVolume(0.35f, 0.35f)
-                    it.start()
-                    players += it
+            fun make(res: Int, vol: Float) {
+                try {
+                    MediaPlayer.create(context, res)?.let {
+                        it.isLooping = true
+                        it.setVolume(vol, vol)
+                        it.start()
+                        players += it
+                    }
+                } catch (_: Exception) {
+                    // Ambience must never take the garden down with it.
                 }
-                MediaPlayer.create(context, R.raw.garden_birds)?.let {
-                    it.isLooping = true
-                    it.setVolume(0.5f, 0.5f)
-                    it.start()
-                    players += it
-                }
-            } catch (_: Exception) {
-                // Ambience must never take the garden down with it.
             }
+            make(R.raw.garden_wind, 0.35f)
+            make(R.raw.garden_birds, 0.5f)
+            // People strolling somewhere on the path — depth, not presence.
+            make(R.raw.garden_steps, 0.28f)
+
+            // Minimizing the app must silence the garden: composition alone
+            // doesn't do it (a backgrounded activity keeps its composition),
+            // so pause/resume follows the real lifecycle.
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE ->
+                        players.forEach { runCatching { it.pause() } }
+                    Lifecycle.Event.ON_RESUME ->
+                        players.forEach { runCatching { it.start() } }
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+
             onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
                 players.forEach { p ->
                     try {
                         p.stop(); p.release()

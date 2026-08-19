@@ -188,5 +188,14 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Coach chat language preference (English/Hindi/Hinglish). Additive.
+        db.execSQL(
+            "ALTER TABLE user_profile ADD COLUMN chatLanguage TEXT NOT NULL DEFAULT 'English'"
+        )
+    }
+}
+
 /** Every migration the app knows about. Pass to `addMigrations(*ALL_MIGRATIONS)`. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)

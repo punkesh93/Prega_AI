@@ -433,15 +433,22 @@ private fun MainScaffold(
                         onCancel = viewModel::cancelKickSession,
                     )
 
-                    Tab.Coach -> CoachScreen(
-                        messages = messages,
-                        loading = chatLoading,
-                        week = profile.currentWeek,
-                        isPremium = profile.isPremium,
-                        questionsRemaining = profile.freeQuestionsRemaining,
-                        onSend = viewModel::askCoach,
-                        onUpgrade = { showPaywall = true },
-                    )
+                    Tab.Coach -> {
+                        val dynamicSuggestions by viewModel.suggestedQuestions.collectAsStateWithLifecycle()
+                        // Regenerate chips when her week or language changes.
+                        LaunchedEffect(profile.currentWeek, profile.chatLanguage) {
+                            viewModel.refreshSuggestedQuestions()
+                        }
+                        CoachScreen(
+                            messages = messages,
+                            loading = chatLoading,
+                            week = profile.currentWeek,
+                            chatLanguage = profile.chatLanguage,
+                            dynamicSuggestions = dynamicSuggestions,
+                            onLanguageChange = viewModel::setChatLanguage,
+                            onSend = viewModel::askCoach,
+                        )
+                    }
 
                     Tab.You -> YouTab(
                         profile = profile,

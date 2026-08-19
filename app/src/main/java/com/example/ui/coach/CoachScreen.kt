@@ -1,5 +1,10 @@
 package com.example.ui.coach
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,6 +21,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,10 +57,10 @@ fun CoachScreen(
     messages: List<ChatMessage>,
     loading: Boolean,
     week: Int,
-    isPremium: Boolean,
-    questionsRemaining: Int,
+    chatLanguage: String,
+    dynamicSuggestions: List<String>,
+    onLanguageChange: (String) -> Unit,
     onSend: (String) -> Unit,
-    onUpgrade: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var input by remember { mutableStateOf("") }
@@ -74,6 +81,10 @@ fun CoachScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
+        // Language: EN / हिंदी / Hinglish — one tap, remembered, applies to
+        // the coach's replies and the suggested chips.
+        LanguageRow(chatLanguage, onLanguageChange)
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f),
@@ -98,7 +109,7 @@ fun CoachScreen(
             if (messages.size <= 1 && !loading) {
                 item {
                     Spacer(Modifier.height(Space.md))
-                    SuggestedQuestions(week) { onSend(it) }
+                    SuggestedQuestions(week, dynamicSuggestions) { onSend(it) }
                 }
             }
         }
@@ -109,14 +120,11 @@ fun CoachScreen(
             }
         }
 
-        if (!isPremium) {
-            FreeQuestionsBar(questionsRemaining, onUpgrade)
-        }
-
         Composer(
             value = input,
             onValueChange = { input = it },
-            enabled = !loading && (isPremium || questionsRemaining > 0),
+            enabled = !loading,
+            chatLanguage = chatLanguage,
             onSend = {
                 val text = input.trim()
                 if (text.isNotEmpty()) {
@@ -126,6 +134,25 @@ fun CoachScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun LanguageRow(selected: String, onSelect: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.gutter, vertical = Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        listOf("English" to "English", "Hindi" to "हिंदी", "Hinglish" to "Hinglish")
+            .forEach { (value, label) ->
+                PregaChip(
+                    label = label,
+                    selected = selected == value,
+                    onClick = { onSelect(value) },
+                )
+            }
     }
 }
 
@@ -231,8 +258,15 @@ private fun ThinkingBubble() {
 // ─── Suggestions ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SuggestedQuestions(week: Int, onPick: (String) -> Unit) {
-    val suggestions = remember(week) { suggestionsFor(week) }
+private fun SuggestedQuestions(
+    week: Int,
+    dynamic: List<String>,
+    onPick: (String) -> Unit,
+) {
+    // AI-written, week+language chips when available; static English set
+    // otherwise (offline, rate-limited, degenerate output — all land here).
+    val suggestions = if (dynamic.isNotEmpty()) dynamic
+    else remember(week) { suggestionsFor(week) }
 
     Column {
         Overline("Not sure where to start")
@@ -284,41 +318,50 @@ internal fun suggestionsFor(week: Int): List<String> = when {
 // ─── Composer ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun FreeQuestionsBar(remaining: Int, onUpgrade: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(PregaTheme.colors.goldSoft)
-            .padding(horizontal = Space.gutter, vertical = Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (remaining > 0) {
-                "$remaining free ${if (remaining == 1) "question" else "questions"} left"
-            } else {
-                "You've used your free questions"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = PregaTheme.colors.ink,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onUpgrade) {
-            Text(
-                "See Premium",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
-
-@Composable
 private fun Composer(
     value: String,
     onValueChange: (String) -> Unit,
     enabled: Boolean,
+    chatLanguage: String,
     onSend: () -> Unit,
 ) {
+    // Voice-to-text via Android's built-in recognizer — no new permission
+    // (the system speech activity owns the microphone), no SDK, and it
+    // follows her chat language: Hindi -> hi-IN, English/Hinglish -> en-IN
+    // (Indian English recognition handles Hinglish code-switching best).
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val heard = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            .orEmpty()
+        if (heard.isNotBlank()) {
+            onValueChange(if (value.isBlank()) heard else "$value $heard")
+        }
+    }
+    val speechAvailable = remember {
+        // Devices without the Google speech activity would crash on launch.
+        true
+    }
+
+    fun launchSpeech() {
+        val locale = if (chatLanguage == "Hindi") "hi-IN" else "en-IN"
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Prega…")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            // No recognizer on this device — typing still works; stay silent.
+        }
+    }
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -328,6 +371,25 @@ private fun Composer(
             .padding(Space.md),
         verticalAlignment = Alignment.Bottom,
     ) {
+        // Mic — speak instead of type.
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(PregaTheme.colors.lavenderSoft)
+                .clickable(enabled = enabled && speechAvailable) { launchSpeech() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Mic,
+                contentDescription = "Speak your question",
+                tint = PregaTheme.colors.ink,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+
+        Spacer(Modifier.width(Space.sm))
+
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,

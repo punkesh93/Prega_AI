@@ -31,6 +31,12 @@ data class UserProfileEntity(
      * permanently (see MIGRATION_5_6, PregnancyViewModel.askCoach).
      */
     val lastQuestionResetDate: String = "",
+    /**
+     * Coach chat language: "English" (default), "Hindi", or "Hinglish".
+     * Injected into every coach prompt (PregaPrompts.language). Added in
+     * MIGRATION_6_7.
+     */
+    val chatLanguage: String = "English",
 
     val lmpDate: String = "",
     val testDate: String = "",
@@ -265,7 +271,7 @@ interface PregnancyDao {
         WeightEntity::class,
         JournalEntity::class,
     ],
-    version = 6,
+    version = 7,
     // Schemas are exported to app/schemas so migrations can be tested against
     // real historical schemas rather than written blind.
     exportSchema = true,

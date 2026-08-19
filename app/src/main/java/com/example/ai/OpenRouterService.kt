@@ -70,20 +70,25 @@ interface OpenRouterApi {
  */
 /**
  * Cost note from real testing: credits were burning fast, so both tiers now
- * point at a free chat model. (The specifically requested
+ * point at free chat models. (The specifically requested
  * nvidia/nemotron-3-embed-1b cannot be used: it is an EMBEDDING model — it
  * converts text to vectors for search and cannot generate a single word of
  * reply. Wiring it in would silently break the coach, insights, captions,
- * everything.) Llama 3.3 70B free is the strongest no-cost chat option on
- * OpenRouter; quality for the coach will be a step below Claude — revert
- * Conversational to "anthropic/claude-sonnet-4.5" the moment revenue
- * justifies it, or when the Supabase proxy adds per-user rate limits.
- * Free-tier models are also rate-limited by OpenRouter, so occasional
- * "try again in a moment" fallbacks are expected under load.
+ * everything.)
+ *
+ * Coach now runs Nemotron 3 Ultra 550B (free) — user-requested upgrade from
+ * the small Gemma, and the generic-answer complaints trace directly to the
+ * small model. Quick copy stays on small Gemma: it's plenty for 45-word
+ * insights, and splitting the load across two free models halves the chance
+ * of hitting either one's free-tier rate limit. Free-tier serving is also
+ * exactly where degenerate output (<pad> spam, loops) comes from — which is
+ * why isDegenerate() gates every response centrally. Revert Conversational
+ * to "anthropic/claude-sonnet-4.5" the moment revenue justifies it, or when
+ * the Supabase proxy adds per-user rate limits.
  */
 enum class PregaModel(val slug: String) {
     /** Coach conversations, meal plans — quality matters most. */
-    Conversational("google/gemma-4-26b-a4b-it:free"),
+    Conversational("nvidia/nemotron-3-ultra-550b-a55b:free"),
     /** Notification copy, micro-content, quest text — high volume, short. */
     Quick("google/gemma-4-26b-a4b-it:free"),
 }
