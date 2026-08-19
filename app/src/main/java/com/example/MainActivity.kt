@@ -16,6 +16,30 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
@@ -64,6 +88,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ── Crash flight recorder, part 2 (see PregaApplication) ──
+        // If the previous run died with an uncaught exception, show its
+        // stack trace INSTEAD of running the app into the same crash, so
+        // the exact failing line can be screenshotted and reported. This
+        // check runs before every other line of init on purpose.
+        val crashFile = java.io.File(filesDir, PregaApplication.CRASH_FILE)
+        if (crashFile.exists()) {
+            val trace = runCatching { crashFile.readText() }
+                .getOrDefault("(crash file unreadable)")
+            setContent { CrashReportScreen(trace) { crashFile.delete(); recreate() } }
+            return
+        }
+
         enableEdgeToEdge()
 
         NotificationChannels.registerAll(this)
@@ -191,5 +229,54 @@ class MainActivity : ComponentActivity() {
                 "?sku=${BillingManager.PREMIUM_SUBSCRIPTION_ID}&package=$packageName"
         )
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+    }
+}
+
+/**
+ * Full-screen crash trace, shown on the launch AFTER a crash instead of
+ * re-running straight into it. Deliberately built from nothing but core
+ * Material3 + foundation with zero app components or theme dependencies —
+ * the screen that reports failures must be simple enough to never fail.
+ */
+@Composable
+private fun CrashReportScreen(trace: String, onRetry: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    MaterialTheme {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().padding(20.dp)) {
+                Text(
+                    "The app hit a problem last time",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "This is the technical report. Tap Copy and send it to the developer — " +
+                        "it shows the exact line that failed.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                SelectionContainer(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        trace,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { clipboard.setText(AnnotatedString(trace)) }) {
+                        Text("Copy report")
+                    }
+                    OutlinedButton(onClick = onRetry) {
+                        Text("Try the app again")
+                    }
+                }
+            }
+        }
     }
 }

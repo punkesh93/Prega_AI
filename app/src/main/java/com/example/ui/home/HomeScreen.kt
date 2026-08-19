@@ -1054,7 +1054,11 @@ private fun QuickLog(
             PregaTheme.colors.sageSoft,        // good
             PregaTheme.colors.successSoft,     // great
         )
-        val selectedIndex = mood?.mood?.minus(1)
+        // takeIf guards a latent IndexOutOfBounds: Kotlin's % keeps negatives
+        // negative, so a mood of 0 would index position -1. Mood values are
+        // 1..5 by construction, but a crash-on-render is too high a price to
+        // bet on "by construction".
+        val selectedIndex = mood?.mood?.takeIf { it in 1..MOODS.size }?.minus(1)
         val cardTint by animateColorAsState(
             targetValue = selectedIndex?.let { moodTints[it % moodTints.size] }
                 ?: PregaTheme.colors.cardSurface,
