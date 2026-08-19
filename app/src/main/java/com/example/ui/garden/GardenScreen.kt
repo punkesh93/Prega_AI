@@ -116,6 +116,9 @@ fun GardenScreen(
             )
         }
 
+        // Wind + birdsong while she's here; chip toggles and remembers.
+        GardenAmbience()
+
         Spacer(Modifier.height(Space.md))
 
         val shareContext = androidx.compose.ui.platform.LocalContext.current

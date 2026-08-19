@@ -653,13 +653,48 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 ),
                 userPrompt = "Today is ${_todayDate.value}. Give me today's affirmation.",
                 model = PregaModel.Quick,
-                temperature = 1.0,
+                temperature = 0.7,
                 maxTokens = 60,
             )?.stripMarkdown() ?: FALLBACK_AFFIRMATIONS[
                 // Stable per-day pick, so it doesn't change on every recomposition.
                 (_todayDate.value.hashCode().let { if (it < 0) -it else it }) % FALLBACK_AFFIRMATIONS.size
             ]
         }
+    }
+
+    /**
+     * Offline insights, one pool per trimester. The insight card must NEVER
+     * sit on a skeleton forever — that reads as "the app is broken" (exactly
+     * the bug report that prompted this). If the AI call fails for any
+     * reason (no credit, rate limit, degenerate output, no internet), the
+     * card gets one of these instead, picked stably per day.
+     */
+    private val FALLBACK_INSIGHTS_T1 = listOf(
+        "Early weeks are heavy lifting: organs are forming and your body is building the placenta from scratch. Tiredness now is construction work, not weakness.",
+        "Nausea often peaks around now and eases by the second trimester. Small, frequent bites and cold foods are gentler than big meals.",
+        "Your blood volume is already increasing to support the baby. Extra water genuinely helps with the headaches and dizziness this can bring.",
+        "The baby's heart is among the very first things to form and start beating. Most of the drama is invisible from the outside right now.",
+    )
+    private val FALLBACK_INSIGHTS_T2 = listOf(
+        "Many mothers feel energy return in these middle weeks. A gentle daily walk is one of the best-supported habits for the whole pregnancy.",
+        "The baby is developing hearing now. Your voice, carried through your body, is becoming the most familiar sound in their world.",
+        "First flutters are often felt in this stretch — like bubbles or a light tap. They get unmistakable with time.",
+        "Your centre of gravity is shifting as the bump grows. Slower position changes help with the light-headedness when standing up.",
+    )
+    private val FALLBACK_INSIGHTS_T3 = listOf(
+        "The baby is practicing breathing movements now — inhaling amniotic fluid to strengthen tiny lungs for the outside world.",
+        "Sleep gets harder in the third trimester. Pillows under the bump and between the knees make side-sleeping kinder on your back.",
+        "Noticing kick patterns matters most now: you know your baby's rhythm best, and any real change is worth a call to your midwife.",
+        "Your body is quietly rehearsing too — practice tightenings that come and go are it warming up, not the real thing.",
+    )
+
+    private fun fallbackInsight(week: Int): String {
+        val pool = when (trimesterFor(week)) {
+            1 -> FALLBACK_INSIGHTS_T1
+            2 -> FALLBACK_INSIGHTS_T2
+            else -> FALLBACK_INSIGHTS_T3
+        }
+        return pool[(_todayDate.value.hashCode().let { if (it < 0) -it else it }) % pool.size]
     }
 
     /**
@@ -679,9 +714,12 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                 ),
                 userPrompt = "Today is ${_todayDate.value}. Give me today's insight.",
                 model = PregaModel.Quick,
-                temperature = 1.0,
+                // Was 1.0 — the most loop-prone setting, and the two garbage
+                // outputs users actually saw (word loops, <pad> spam) both
+                // came from this path. 0.7 keeps variety with less chaos.
+                temperature = 0.7,
                 maxTokens = 120,
-            )?.stripMarkdown()
+            )?.stripMarkdown() ?: fallbackInsight(week)
         }
     }
 

@@ -97,6 +97,11 @@ fun StepsTile(
             sensorMissing = counter == null && detector == null
             if (counter != null) {
                 sm.registerListener(listener, counter, SensorManager.SENSOR_DELAY_UI, 0)
+                // The counter batches hard on many devices and may not emit
+                // ANYTHING until the hardware FIFO fills — which looks like a
+                // dead tile ("Steps shows nothing", real bug report). flush()
+                // forces immediate delivery of whatever is pending.
+                sm.flush(listener)
             }
             if (detector != null) {
                 sm.registerListener(listener, detector, SensorManager.SENSOR_DELAY_UI, 0)
@@ -154,6 +159,7 @@ fun StepsTile(
                 Spacer(Modifier.height(Space.xxs))
                 Text(
                     if (stepsToday >= STEP_GOAL) "Gentle goal reached 🌸"
+                    else if (stepsToday == 0) "counts as you walk, phone with you"
                     else "gentle goal $STEP_GOAL",
                     style = MaterialTheme.typography.bodySmall,
                     color = PregaTheme.colors.inkMuted,
