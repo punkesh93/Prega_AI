@@ -38,7 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -517,14 +519,18 @@ private fun LittleOneHero(
                     },
             )
             // Breathing warm glow, bottom-anchored, doubles as a text scrim.
+            // Starts higher (45%) and lands darker than v1: the orb art is
+            // brightest exactly where the text sits, and the QA crop
+            // simulation showed white-on-glow going marginal without this.
             Box(
                 Modifier
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            0.55f to Color.Transparent,
-                            1f to Color(0xFF2B1E14).copy(alpha = 0.55f + glow * 0.2f),
+                            0.45f to Color.Transparent,
+                            0.75f to Color(0xFF2B1E14).copy(alpha = 0.34f),
+                            1f to Color(0xFF2B1E14).copy(alpha = 0.68f + glow * 0.14f),
                         )
                     ),
             )
@@ -538,11 +544,19 @@ private fun LittleOneHero(
                     .align(Alignment.BottomStart)
                     .padding(Space.lg),
             ) {
+                // Soft drop shadows on all three lines: the 40 bundled
+                // images vary in brightness where text lands, and legible-
+                // everywhere beats trusting each render.
+                val glowShadow = Shadow(
+                    color = Color(0x59000000),
+                    offset = Offset(0f, 2f),
+                    blurRadius = 10f,
+                )
                 Overline("Your little one", color = Color.White.copy(alpha = 0.85f))
                 Spacer(Modifier.height(Space.xs))
                 Text(
                     "Week ${weekInfo.week}",
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.displayMedium.copy(shadow = glowShadow),
                     color = Color.White,
                 )
                 Spacer(Modifier.height(Space.xxs))
@@ -551,8 +565,8 @@ private fun LittleOneHero(
                         "About the size of a ${weekInfo.sizeName.lowercase()} ${weekInfo.iconEmoji}"
                     else
                         "$babyName is about the size of a ${weekInfo.sizeName.lowercase()} ${weekInfo.iconEmoji}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.92f),
+                    style = MaterialTheme.typography.bodyMedium.copy(shadow = glowShadow),
+                    color = Color.White.copy(alpha = 0.95f),
                 )
             }
         }
