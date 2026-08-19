@@ -1,0 +1,107 @@
+rules_version = '2';
+
+// Prega AI — Birth Club community rules (Phase 1, text-only).
+//
+// Paste into: Firebase console -> Firestore Database -> Rules -> Publish.
+//
+// Model: membership-gated clubs keyed by due month. A signed-in (anonymous)
+// user can read/write inside a club only while a member of it. Writes must
+// be authored as yourself; nobody can edit anyone's words (delete-own only);
+// the 'hidden' flag is console-moderation-only; reports are write-only from
+// clients; block lists are private to their owner. Blocking FILTERS on the
+// client (rules cannot filter list queries by another collection) — these
+// rules' job is honesty of writes and privacy of reads.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMember(club) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/clubs/$(club)/members/$(request.auth.uid));
+    }
+
+    // ── Profiles: public handle card; only you write yours ──
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.handle is string
+        && request.resource.data.handle.size() >= 3
+        && request.resource.data.handle.size() <= 24;
+      allow delete: if signedIn() && request.auth.uid == uid;
+
+      // Private block list — invisible to everyone else.
+      match /blocks/{blockedUid} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ── Clubs ──
+    match /clubs/{club} {
+      // Anyone signed-in may read club metadata and create-on-first-join
+      // (set with merge). Nobody deletes clubs from a phone.
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['name']);
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(club) || (signedIn() && request.auth.uid == uid);
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow delete: if signedIn() && request.auth.uid == uid;
+        allow update: if false;
+      }
+
+      match /messages/{id} {
+        allow read: if isMember(club) && resource.data.hidden == false;
+        allow create: if isMember(club)
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() >= 1
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.hidden == false;
+        // Delete your own words; edit nobody's. 'hidden' flips only in the
+        // console (service access bypasses rules), i.e. human moderation.
+        allow delete: if isMember(club) && resource.data.authorId == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /posts/{id} {
+        allow read: if isMember(club) && resource.data.hidden == false;
+        allow create: if isMember(club)
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() >= 1
+          && request.resource.data.body.size() <= 1000
+          && request.resource.data.week is int
+          && request.resource.data.hidden == false;
+        allow delete: if isMember(club) && resource.data.authorId == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /circles/{id} {
+        allow read: if isMember(club);
+        allow create: if isMember(club)
+          && request.resource.data.hostId == request.auth.uid
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 3
+          && request.resource.data.title.size() <= 80;
+        allow delete: if isMember(club) && resource.data.hostId == request.auth.uid;
+        allow update: if false;
+      }
+    }
+
+    // ── Reports: clients may only file them; reviewing happens in console ──
+    match /reports/{id} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 300;
+      allow read, update, delete: if false;
+    }
+
+    // Everything else: closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -64,7 +64,7 @@ import java.io.File
 fun JournalScreen(
     entries: List<JournalEntity>,
     checkedInToday: Boolean,
-    onSave: (note: String, photoFile: String, mood: Int) -> Unit,
+    onSave: (note: String, photoFile: String, mood: Int, shareToClub: Boolean) -> Unit,
     onDelete: (Long) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -110,8 +110,8 @@ fun JournalScreen(
                     .verticalScroll(rememberScrollState()),
             ) {
                 Composer(
-                    onSave = { note, photo, mood ->
-                        onSave(note, photo, mood)
+                    onSave = { note, photo, mood, share ->
+                        onSave(note, photo, mood, share)
                         composing = false
                     },
                     onCancel = { composing = false },
@@ -130,7 +130,7 @@ fun JournalScreen(
 
 @Composable
 private fun Composer(
-    onSave: (note: String, photoFile: String, mood: Int) -> Unit,
+    onSave: (note: String, photoFile: String, mood: Int, shareToClub: Boolean) -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -138,6 +138,7 @@ private fun Composer(
     var note by remember { mutableStateOf("") }
     var mood by remember { mutableStateOf(0) }
     var photoFile by remember { mutableStateOf("") }
+    var shareToClub by remember { mutableStateOf(false) }
 
     val pickPhoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -245,11 +246,35 @@ private fun Composer(
         }
 
         Spacer(Modifier.height(Space.lg))
+        // Journal is private by default, forever. Sharing is a per-entry,
+        // eyes-open choice — and it shares the WORDS only: photos stay on
+        // her phone in community Phase 1.
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Share with my birth club",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PregaTheme.colors.ink,
+                )
+                Text(
+                    if (shareToClub) "Your note (not the photo) will be posted"
+                    else "Just for you",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkFaint,
+                )
+            }
+            Switch(checked = shareToClub, onCheckedChange = { shareToClub = it })
+        }
+
+        Spacer(Modifier.height(Space.md))
         // Stacked, not side-by-side: the save action is the hero and can
         // never again be squeezed out of a Row.
         PregaButton(
             text = "Keep this day",
-            onClick = { onSave(note.trim(), photoFile, mood) },
+            onClick = { onSave(note.trim(), photoFile, mood, shareToClub) },
         )
         Spacer(Modifier.height(Space.sm))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {

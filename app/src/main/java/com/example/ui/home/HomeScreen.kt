@@ -94,6 +94,7 @@ fun HomeScreen(
     onToggleTheme: () -> Unit = {},
     onOpenJournal: () -> Unit = {},
     onOpenGarden: () -> Unit = {},
+    onOpenCommunity: () -> Unit = {},
     onOpenMenu: () -> Unit = {},
     onStepsGoal: () -> Unit = {},
     checkedInToday: Boolean = true,
@@ -198,6 +199,34 @@ fun HomeScreen(
                 onOpenJournal = onOpenJournal,
                 onOpenGarden = onOpenGarden,
             )
+        }
+
+        item {
+            // Birth Club entry — a full-width invitation rather than a grid
+            // cell: community is new and opt-in, so it earns one warm banner.
+            PregaCard(
+                onClick = onOpenCommunity,
+                containerColor = PregaTheme.colors.lavenderSoft,
+                border = false,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("\uD83E\uDEC2", fontSize = 26.sp)
+                    Spacer(Modifier.width(Space.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Your birth club",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = PregaTheme.colors.ink,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Mothers due the same month as you — chat, share, and meet on video circles.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PregaTheme.colors.inkMuted,
+                        )
+                    }
+                }
+            }
         }
 
         state.nextAppointment?.let {

@@ -264,6 +264,7 @@ private fun MainScaffold(
     var showPaywall by rememberSaveable { mutableStateOf(false) }
     var showJournal by rememberSaveable { mutableStateOf(false) }
     var showAppointments by rememberSaveable { mutableStateOf(false) }
+    var showCommunity by rememberSaveable { mutableStateOf(false) }
     // Hoisted so the drawer can land on a SPECIFIC section — with the state
     // private to YouTab, "Settings" in the menu could only ever reach the
     // tab's front door (the garden), which is the routing bug reported.
@@ -307,11 +308,12 @@ private fun MainScaffold(
     // Back now means "one step out": overlay -> close it; non-home tab ->
     // home; home -> the system exits as normal.
     androidx.activity.compose.BackHandler(
-        enabled = showJournal || showAppointments || showPaywall || tab != Tab.Today,
+        enabled = showJournal || showAppointments || showCommunity || showPaywall || tab != Tab.Today,
     ) {
         when {
             showJournal -> showJournal = false
             showAppointments -> showAppointments = false
+            showCommunity -> showCommunity = false
             showPaywall -> showPaywall = false
             tab != Tab.Today -> tab = Tab.Today
         }
@@ -413,6 +415,7 @@ private fun MainScaffold(
                             viewModel.refreshCheckInState()
                             showJournal = true
                         },
+                        onOpenCommunity = { showCommunity = true },
                         checkedInToday = checkedInToday,
                     )
 
@@ -510,6 +513,27 @@ private fun MainScaffold(
                 onSave = viewModel::saveJournalEntry,
                 onDelete = viewModel::deleteJournalEntry,
                 onBack = { showJournal = false },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showCommunity,
+            enter = Motion.riseIn(),
+            exit = Motion.riseOut(),
+        ) {
+            // Club grouping needs the due month. Stored dueDate formats have
+            // drifted across onboarding versions, so accept it only when it's
+            // clean ISO and otherwise derive from the current week — always
+            // available, and month-accurate is all a birth club needs.
+            val isoDue = profile.dueDate.takeIf {
+                Regex("""\d{4}-\d{2}-\d{2}""").matches(it)
+            } ?: java.time.LocalDate.now()
+                .plusWeeks((40 - profile.currentWeek).coerceAtLeast(0).toLong())
+                .toString()
+            com.example.community.CommunityScreen(
+                dueDate = isoDue,
+                currentWeek = profile.currentWeek,
+                onClose = { showCommunity = false },
             )
         }
 

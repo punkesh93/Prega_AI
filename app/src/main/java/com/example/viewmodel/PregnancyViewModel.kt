@@ -610,7 +610,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
      * warm, matched to her note's vibe — with her note itself as the offline
      * fallback so the entry is never blank.
      */
-    fun saveJournalEntry(note: String, photoFile: String, mood: Int) {
+    fun saveJournalEntry(note: String, photoFile: String, mood: Int, shareToClub: Boolean = false) {
         viewModelScope.launch {
             val p = profile.value ?: return@launch
             val week = p.currentWeek
@@ -643,6 +643,21 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             _checkedInToday.value = true
             award(GamificationEngine.Action.JournalEntry, week, "Memory kept")
             AppStats.log(StatEvent.JournalSaved)
+
+            // Community share: her explicit per-entry choice, words only
+            // (never the photo in Phase 1), fire-and-forget — a failed share
+            // never disturbs the local save that already succeeded.
+            if (shareToClub) {
+                val text = note.ifBlank { caption }
+                com.example.community.CommunityRepository.myProfile()?.let { cp ->
+                    com.example.community.CommunityRepository.sharePost(
+                        club = cp.dueMonth,
+                        profile = cp,
+                        week = week,
+                        body = text,
+                    )
+                }
+            }
         }
     }
 
