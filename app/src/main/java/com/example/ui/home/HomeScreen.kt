@@ -204,6 +204,12 @@ fun HomeScreen(
         item {
             // Birth Club entry — a full-width invitation rather than a grid
             // cell: community is new and opt-in, so it earns one warm banner.
+            // Personalized with HER club (derived from her due date, same
+            // logic as the community screen) so it reads as a real place
+            // that exists for her, not a generic feature ad.
+            val dueMonthLabel = remember(state.profile?.dueDate, state.weekInfo.week) {
+                dueMonthLabelFor(state.profile?.dueDate, state.weekInfo.week)
+            }
             PregaCard(
                 onClick = onOpenCommunity,
                 containerColor = PregaTheme.colors.lavenderSoft,
@@ -214,7 +220,8 @@ fun HomeScreen(
                     Spacer(Modifier.width(Space.md))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Your birth club",
+                            if (dueMonthLabel != null) "Your $dueMonthLabel birth club"
+                            else "Your birth club",
                             style = MaterialTheme.typography.titleMedium,
                             color = PregaTheme.colors.ink,
                         )
@@ -1376,3 +1383,19 @@ private fun Stat(emoji: String, value: String, label: String) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = PregaTheme.colors.inkFaint)
     }
 }
+
+/**
+ * "March 2027" from her due date — or derived from the current week when the
+ * stored date isn't clean ISO (formats drifted across onboarding versions).
+ * Mirrors the derivation the community overlay uses, so the banner and the
+ * club she actually lands in always agree. Null only if everything fails.
+ */
+private fun dueMonthLabelFor(dueDate: String?, currentWeek: Int): String? = runCatching {
+    val iso = dueDate?.takeIf { Regex("""\d{4}-\d{2}-\d{2}""").matches(it) }
+        ?: java.time.LocalDate.now()
+            .plusWeeks((40 - currentWeek).coerceAtLeast(0).toLong())
+            .toString()
+    val date = java.time.LocalDate.parse(iso)
+    date.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) +
+        " " + date.year
+}.getOrNull()

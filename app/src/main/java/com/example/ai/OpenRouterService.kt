@@ -171,35 +171,62 @@ object OpenRouterClient {
         }
 
         try {
-            val response = api.chat(
-                ChatRequest(
-                    model = model.slug,
-                    messages = messages,
-                    temperature = temperature,
-                    maxTokens = maxTokens,
-                )
-            )
-            val text = response.choices?.firstOrNull()?.message?.content?.trim()
-            if (text.isNullOrBlank()) {
-                AiResult.Failure("The model returned an empty response.", retryable = true)
-            } else if (text.isDegenerate()) {
-                // Model got stuck in a repetition loop ("practices iter
-                // practices iter..." — seen in the wild on the daily insight
-                // card). Treat like an empty response: callers with curated
-                // fallbacks use them, the coach shows a retryable error. Never
-                // show looped garbage to a pregnant woman asking about her baby.
-                AiResult.Failure("The model returned a garbled response.", retryable = true)
-            } else {
-                AiResult.Success(text)
-            }
+            val text = chatOnce(model.slug, messages, temperature, maxTokens)
+            classify(text)
         } catch (e: HttpException) {
-            AiResult.Failure(describeHttpError(e.code()), retryable = e.code() in RETRYABLE_CODES)
+            // A 404 here means "no endpoints found for this model" — the slug
+            // has rotted (free models get renamed/retired without notice; it
+            // has happened to this project twice). Rather than a dead coach,
+            // fall back through the known-good chain once.
+            if (e.code() == 404 && model.slug != FALLBACK_SLUG) {
+                try {
+                    classify(chatOnce(FALLBACK_SLUG, messages, temperature, maxTokens))
+                } catch (e2: HttpException) {
+                    AiResult.Failure(describeHttpError(e2.code()), retryable = e2.code() in RETRYABLE_CODES)
+                } catch (e2: IOException) {
+                    AiResult.Failure("No internet connection.", retryable = true)
+                } catch (e2: Exception) {
+                    AiResult.Failure(e2.localizedMessage ?: "Something went wrong.", retryable = true)
+                }
+            } else {
+                AiResult.Failure(describeHttpError(e.code()), retryable = e.code() in RETRYABLE_CODES)
+            }
         } catch (e: IOException) {
             AiResult.Failure("No internet connection.", retryable = true)
         } catch (e: Exception) {
             AiResult.Failure(e.localizedMessage ?: "Something went wrong.", retryable = true)
         }
     }
+
+    private suspend fun chatOnce(
+        slug: String,
+        messages: List<AiMessage>,
+        temperature: Double,
+        maxTokens: Int,
+    ): String? = api.chat(
+        ChatRequest(
+            model = slug,
+            messages = messages,
+            temperature = temperature,
+            maxTokens = maxTokens,
+        )
+    ).choices?.firstOrNull()?.message?.content?.trim()
+
+    private fun classify(text: String?): AiResult = when {
+        text.isNullOrBlank() ->
+            AiResult.Failure("The model returned an empty response.", retryable = true)
+        text.isDegenerate() ->
+            // Model got stuck in a repetition loop ("practices iter
+            // practices iter..." — seen in the wild on the daily insight
+            // card). Treat like an empty response: callers with curated
+            // fallbacks use them, the coach shows a retryable error. Never
+            // show looped garbage to a pregnant woman asking about her baby.
+            AiResult.Failure("The model returned a garbled response.", retryable = true)
+        else -> AiResult.Success(text)
+    }
+
+    /** The model every 404'd slug falls back to — small, stable, free. */
+    private const val FALLBACK_SLUG = "google/gemma-4-26b-a4b-it:free"
 
     /** Convenience for fire-and-forget generation where fallback copy exists. */
     suspend fun completeOrNull(
