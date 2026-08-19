@@ -177,6 +177,13 @@ object OpenRouterClient {
             val text = response.choices?.firstOrNull()?.message?.content?.trim()
             if (text.isNullOrBlank()) {
                 AiResult.Failure("The model returned an empty response.", retryable = true)
+            } else if (text.isDegenerate()) {
+                // Model got stuck in a repetition loop ("practices iter
+                // practices iter..." — seen in the wild on the daily insight
+                // card). Treat like an empty response: callers with curated
+                // fallbacks use them, the coach shows a retryable error. Never
+                // show looped garbage to a pregnant woman asking about her baby.
+                AiResult.Failure("The model returned a garbled response.", retryable = true)
             } else {
                 AiResult.Success(text)
             }
@@ -244,4 +251,46 @@ fun String.stripMarkdown(): String {
     // * or + bullets at line start -> "- "
     s = s.replace(Regex("""(?m)^\s*[*+]\s+"""), "- ")
     return s.trim()
+}
+
+/**
+ * Detects model degeneration — the repetition-loop failure mode where a
+ * completion collapses into the same few words over and over ("practices
+ * iter practices iter practices iter..."). Observed in production on the
+ * daily insight card. Two complementary heuristics, tuned to never flag
+ * legitimate prose (which naturally repeats words like "your", "baby",
+ * "week" — but not the SAME PHRASE back to back many times):
+ *
+ * 1. Consecutive phrase loops: any 1–4 word phrase immediately repeated
+ *    5+ times in a row. Healthy writing essentially never does this;
+ *    looped output almost always does.
+ * 2. Vocabulary collapse: in a long response (30+ words), fewer than 25%
+ *    distinct words. Normal English sits well above 40% even in
+ *    repetitive instructional text.
+ */
+fun String.isDegenerate(): Boolean {
+    val words = trim().lowercase().split(Regex("""\s+""")).filter { it.isNotBlank() }
+    if (words.size < 10) return false
+
+    // 1. Consecutive repeated n-gram (phrase of length 1..4, looped 5+ times)
+    for (n in 1..4) {
+        var run = 1
+        var i = n
+        while (i + n <= words.size) {
+            val same = (0 until n).all { words[i + it] == words[i - n + it] }
+            if (same) {
+                run++
+                if (run >= 5) return true
+                i += n
+            } else {
+                run = 1
+                i += 1
+            }
+        }
+    }
+
+    // 2. Vocabulary collapse on longer texts
+    if (words.size >= 30 && words.distinct().size.toDouble() / words.size < 0.25) return true
+
+    return false
 }
