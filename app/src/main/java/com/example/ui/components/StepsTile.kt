@@ -12,7 +12,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -56,9 +59,21 @@ fun StepsTile(
 ) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(hasPermission(context)) }
+    // Ask-warm-then-ask-Android: the first tap shows WHY in the app's own
+    // voice before the OS dialog appears — a privacy-first app should never
+    // open with a bare system permission prompt (the walkthrough did). And
+    // Android permanently silences the dialog after repeated denials, so a
+    // denied state that routes to Settings keeps the tile alive instead of
+    // leaving a button that does nothing.
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    var denied by rememberSaveable { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted = it }
+    ) { result ->
+        granted = result
+        explaining = false
+        denied = !result
+    }
 
     var stepsToday by remember { mutableStateOf(readCachedSteps(context)) }
 
@@ -118,7 +133,16 @@ fun StepsTile(
 
     PregaCard(
         onClick = {
-            if (!granted) permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            if (!granted) {
+                // Re-check first: she may have just granted it from Settings,
+                // and remembered state would otherwise show a stale "denied".
+                granted = hasPermission(context)
+                when {
+                    granted -> { denied = false; explaining = false }
+                    denied -> openAppSettings(context)
+                    else -> explaining = true
+                }
+            }
         },
         containerColor = PregaTheme.colors.successSoft,
         border = false,
@@ -136,7 +160,45 @@ fun StepsTile(
                 )
             }
             Spacer(Modifier.weight(1f))
-            if (!granted) {
+            if (!granted && denied) {
+                Text(
+                    "Step counting is switched off in Android — tap to open Settings and allow it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+            } else if (!granted && explaining) {
+                Text(
+                    "Steps are counted by this phone and never leave it. Android will ask once.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+                Spacer(Modifier.height(Space.sm))
+                Row {
+                    Text(
+                        "Count my steps",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                permissionLauncher.launch(
+                                    Manifest.permission.ACTIVITY_RECOGNITION
+                                )
+                            }
+                            .padding(vertical = 4.dp, horizontal = Space.sm),
+                    )
+                    Spacer(Modifier.width(Space.sm))
+                    Text(
+                        "Not now",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PregaTheme.colors.inkFaint,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { explaining = false }
+                            .padding(vertical = 4.dp, horizontal = Space.sm),
+                    )
+                }
+            } else if (!granted) {
                 Text(
                     "Tap to count today's walk",
                     style = MaterialTheme.typography.bodySmall,
@@ -166,6 +228,18 @@ fun StepsTile(
                 )
             }
         }
+    }
+}
+
+/** Straight to THIS app's settings page, where the permission toggle lives. */
+private fun openAppSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:" + context.packageName),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 }
 
