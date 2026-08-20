@@ -110,6 +110,18 @@ fun HomeScreen(
     onOpenAppointments: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Update availability is resolved OUTSIDE the list: an always-present
+    // empty item would still receive spacedBy spacing, permanently padding
+    // the top of Home by one gap even with no update to show.
+    val context = LocalContext.current
+    var updateTag by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        updateTag = com.example.update.UpdateChecker.updateAvailable(
+            context, java.time.LocalDate.now().toString(),
+        )
+        if (updateTag != null) AppStats.log(StatEvent.UpdateShown)
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -122,10 +134,10 @@ fun HomeScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
-        item {
-            // Local date key: throttles the once-a-day update check without
-            // threading a new field through HomeState.
-            UpdateCard(todayDate = remember { java.time.LocalDate.now().toString() })
+        updateTag?.let { tag ->
+            item {
+                UpdateCard(tag = tag, onDismissed = { updateTag = null })
+            }
         }
 
         item {
@@ -1433,19 +1445,12 @@ private fun dueMonthLabelFor(dueDate: String?, currentWeek: Int): String? = runC
 }.getOrNull()
 
 /**
- * "A fresh version is ready" — appears only when a genuinely newer build is
- * published (see UpdateChecker), one tap downloads it, X dismisses that
- * release forever. Checked once per day, everything-fails-silent.
+ * "A fresh version is ready" card — availability is decided by the
+ * caller (see HomeScreen); this only presents and handles the two taps.
  */
 @Composable
-private fun UpdateCard(todayDate: String) {
+private fun UpdateCard(tag: String, onDismissed: () -> Unit) {
     val context = LocalContext.current
-    var tag by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(todayDate) {
-        tag = com.example.update.UpdateChecker.updateAvailable(context, todayDate)
-        if (tag != null) AppStats.log(StatEvent.UpdateShown)
-    }
-    val current = tag ?: return
 
     PregaCard(containerColor = PregaTheme.colors.sageSoft, border = false) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1494,8 +1499,8 @@ private fun UpdateCard(todayDate: String) {
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.small)
                             .clickable {
-                                com.example.update.UpdateChecker.dismiss(context, current)
-                                tag = null
+                                com.example.update.UpdateChecker.dismiss(context, tag)
+                                onDismissed()
                             }
                             .padding(vertical = 4.dp, horizontal = Space.sm),
                     )
