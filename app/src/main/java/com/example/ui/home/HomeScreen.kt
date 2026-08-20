@@ -17,6 +17,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -220,15 +223,15 @@ fun HomeScreen(
             }
         }
 
+        state.affirmation?.let {
+            item { AffirmationCard(it) }
+        }
+
         if (!checkedInToday) {
             item { Reveal(2) { CheckInCard(onOpenJournal) } }
         }
 
         item { Reveal(3) { InsightCard(state.insight, onOpenCoach) } }
-
-        state.affirmation?.let {
-            item { AffirmationCard(it) }
-        }
 
         if (state.quests.isNotEmpty()) {
             item { QuestSection(state.quests, onQuestComplete) }
@@ -339,22 +342,21 @@ private fun ExploreGrid(
     onOpenJournal: () -> Unit,
     onOpenGarden: () -> Unit,
 ) {
+    // Mockup adoption: the 2x3 grid becomes one swipeable row of circular
+    // tiles — a third of the height, same six doors, same pastel tints.
     Column {
         SectionHeader(title = "Explore", overline = "Everything, one tap")
         Spacer(Modifier.height(Space.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            ExploreCell("Count kicks", PregaTheme.colors.sageSoft, onOpenKicks, Modifier.weight(1f))
-            ExploreCell("Ask Prega AI", PregaTheme.colors.lavenderSoft, onOpenCoach, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(Space.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            ExploreCell("Your journey", PregaTheme.colors.terracottaSoft, onOpenJourney, Modifier.weight(1f))
-            ExploreCell("Appointments", PregaTheme.colors.goldSoft, onOpenAppointments, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(Space.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            ExploreCell("My journal", PregaTheme.colors.lavenderSoft, onOpenJournal, Modifier.weight(1f))
-            ExploreCell("My garden", PregaTheme.colors.sageSoft, onOpenGarden, Modifier.weight(1f))
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Space.lg),
+        ) {
+            ExploreCell("Kicks", "\uD83D\uDC63", PregaTheme.colors.sageSoft, onOpenKicks)
+            ExploreCell("Ask Prega", "\uD83D\uDCAC", PregaTheme.colors.lavenderSoft, onOpenCoach)
+            ExploreCell("Journey", "\uD83C\uDF31", PregaTheme.colors.terracottaSoft, onOpenJourney)
+            ExploreCell("Visits", "\uD83D\uDCC5", PregaTheme.colors.goldSoft, onOpenAppointments)
+            ExploreCell("Journal", "\uD83D\uDCD6", PregaTheme.colors.lavenderSoft, onOpenJournal)
+            ExploreCell("Garden", "\uD83C\uDF3A", PregaTheme.colors.sageSoft, onOpenGarden)
         }
     }
 }
@@ -362,44 +364,24 @@ private fun ExploreGrid(
 @Composable
 private fun ExploreCell(
     title: String,
+    emoji: String,
     tint: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    PregaCard(
-        onClick = onClick,
-        containerColor = tint,
-        border = false,
-        contentPadding = PaddingValues(Space.md),
-        modifier = modifier.heightIn(min = 96.dp),
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = onClick).padding(4.dp),
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = PregaTheme.colors.ink,
-            )
-            Spacer(Modifier.weight(1f))
-            // The reference's corner arrow chip, bottom-right.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(PregaTheme.colors.cardSurface.copy(alpha = 0.75f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = PregaTheme.colors.ink,
-                        modifier = Modifier
-                            .size(15.dp)
-                            .graphicsLayer { rotationZ = -45f },
-                    )
-                }
-            }
-        }
+        Box(
+            Modifier.size(64.dp).clip(CircleShape).background(tint),
+            contentAlignment = Alignment.Center,
+        ) { Text(emoji, fontSize = 26.sp) }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.labelMedium,
+            color = PregaTheme.colors.inkMuted,
+        )
     }
 }
 
@@ -871,34 +853,22 @@ private fun InsightCard(insight: String?, onOpenCoach: () -> Unit) {
  */
 @Composable
 private fun AffirmationCard(text: String) {
-    GradientCard(
-        brush = PregaTheme.colors.goldBrush,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(0.dp),
+    // Thin banner, not a hero-sized card — the mockup review's own note.
+    PregaCard(
+        containerColor = PregaTheme.colors.lavenderSoft,
+        border = false,
+        contentPadding = PaddingValues(horizontal = Space.md, vertical = Space.sm),
     ) {
-      Box {
-        LeafSprig(
-            color = Color.White.copy(alpha = 0.35f),
-            rotationDegrees = 12f,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .size(84.dp)
-                .padding(end = Space.sm),
-        )
-        Column(Modifier.padding(Space.lg)) {
-        Overline("Today's affirmation", color = Color.White.copy(alpha = 0.85f))
-        Spacer(Modifier.height(Space.sm))
-        Text(
-            "\u201C$text\u201D",
-            style = MaterialTheme.typography.headlineSmall,
-            color = Color.White,
-        )
-        Spacer(Modifier.height(Space.sm))
-        // White-tinted listen chip — the one place the default faint ink
-        // would vanish against the gold.
-        ListenChip(text, tint = Color.White.copy(alpha = 0.85f))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("\u201C", style = MaterialTheme.typography.headlineSmall, color = PregaTheme.colors.ink)
+            Spacer(Modifier.width(Space.sm))
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = FontStyle.Italic,
+                color = PregaTheme.colors.ink,
+            )
         }
-      }
     }
 }
 
@@ -946,9 +916,15 @@ private fun QuestSection(quests: List<QuestEntity>, onComplete: (QuestEntity) ->
         )
         Spacer(Modifier.height(Space.md))
 
-        Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+        // Horizontal carousel (mockup adoption): three pastel cards side by
+        // side instead of a stack — roughly half the vertical space, and the
+        // remaining colour still shows what's left at a glance.
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+        ) {
             quests.forEachIndexed { index, quest ->
-                QuestRow(quest, index, onComplete)
+                Box(Modifier.width(200.dp)) { QuestRow(quest, index, onComplete) }
             }
         }
 
