@@ -1,7 +1,6 @@
 package com.example.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,7 +32,6 @@ import com.example.data.BadgeDef
 import com.example.data.UserProfileEntity
 import com.example.ui.coach.CoachScreen
 import com.example.ui.components.BadgeReveal
-import com.example.ui.components.RewardToast
 import com.example.ui.home.HomeScreen
 import com.example.ui.home.HomeState
 import com.example.ui.journey.JourneyScreen
@@ -48,7 +46,6 @@ import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
 import com.example.viewmodel.PregnancyViewModel
 import com.example.viewmodel.RewardEvent
-import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -260,7 +257,15 @@ private fun MainScaffold(
     themeMode: com.example.ui.theme.ThemeMode,
     onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
 ) {
-    var tab by rememberSaveable { mutableStateOf(Tab.Today) }
+    // The five tabs live in a HorizontalPager so the whole app answers to a
+    // thumb-swipe — Today ⇄ Journey ⇄ Kicks ⇄ Prega AI ⇄ You — with the
+    // bottom bar and the pager driving each other. rememberPagerState is
+    // saveable, so rotation and process death restore the same tab.
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = Tab.Today.ordinal,
+        pageCount = { Tab.entries.size },
+    )
+    val tab = Tab.entries[pagerState.currentPage]
     var showPaywall by rememberSaveable { mutableStateOf(false) }
     var showJournal by rememberSaveable { mutableStateOf(false) }
     var showAppointments by rememberSaveable { mutableStateOf(false) }
@@ -278,6 +283,12 @@ private fun MainScaffold(
         androidx.compose.material3.DrawerValue.Closed
     )
     val drawerScope = rememberCoroutineScope()
+
+    // Single door for tab navigation: taps, drawer rows, and Home shortcuts
+    // all animate the pager, so "go to Kicks" always looks and feels the same.
+    val goTo: (Tab) -> Unit = { destination ->
+        drawerScope.launch { pagerState.animateScrollToPage(destination.ordinal) }
+    }
 
     val todayLog by viewModel.todayLog.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
@@ -302,7 +313,10 @@ private fun MainScaffold(
     val weekInfo = remember(profile.currentWeek) { viewModel.getWeekInfo(profile.currentWeek) }
 
     // ── Reward overlays ──
-    var toast by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // Only badge reveals surface here. Points, streaks and level-ups still
+    // exist in the data layer (they quietly grow the garden) but are never
+    // announced — a pop-up scoreboard is exactly the productivity pressure
+    // the product philosophy rules out.
     var revealBadge by remember { mutableStateOf<BadgeDef?>(null) }
 
     // The system back gesture was closing the whole app from anywhere.
@@ -317,7 +331,7 @@ private fun MainScaffold(
             showAppointments -> showAppointments = false
             showCommunity -> showCommunity = false
             showPaywall -> showPaywall = false
-            tab != Tab.Today -> tab = Tab.Today
+            tab != Tab.Today -> goTo(Tab.Today)
         }
     }
 
@@ -325,27 +339,20 @@ private fun MainScaffold(
 
     LaunchedEffect(Unit) {
         viewModel.rewards.collect { event ->
-            when (event) {
-                is RewardEvent.Points -> toast = "✨" to "+${event.amount} · ${event.reason}"
-                is RewardEvent.StreakExtended -> toast = "🔥" to "${event.days} day streak"
-                // Framed as protection, never as a loss.
-                is RewardEvent.StreakProtected ->
-                    toast = "🛡️" to "Streak protected · ${event.remaining} grace days left"
-                is RewardEvent.LevelUp -> toast = "👑" to "Level ${event.level} · ${event.title}"
-                is RewardEvent.BadgeEarned -> revealBadge = event.badge
-            }
-        }
-    }
-
-    LaunchedEffect(toast) {
-        if (toast != null) {
-            delay(2600)
-            toast = null
+            if (event is RewardEvent.BadgeEarned) revealBadge = event.badge
         }
     }
 
     androidx.compose.material3.ModalNavigationDrawer(
         drawerState = drawerState,
+        // THE fix for "swipes don't work": Material3's modal drawer competes
+        // for horizontal drags across the ENTIRE screen while closed, so the
+        // quest carousel, the Explore row and now the tab pager all lost
+        // their gestures to it (the video shows the drawer sliding out under
+        // a carousel swipe). Gestures stay on only while the drawer is open
+        // — swipe/scrim still close it; opening is the avatar tap, which is
+        // also the drawer's stated front door.
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             AppDrawer(
                 name = profile.name,
@@ -354,13 +361,13 @@ private fun MainScaffold(
                     drawerScope.launch { drawerState.close() }
                     when (destination) {
                         "journal" -> { viewModel.refreshCheckInState(); showJournal = true }
-                        "garden" -> { youSection = 0; tab = Tab.You }
+                        "garden" -> { youSection = 0; goTo(Tab.You) }
                         "appointments" -> showAppointments = true
-                        "badges" -> { youSection = 1; tab = Tab.You }
-                        "settings" -> { youSection = 2; tab = Tab.You }
+                        "badges" -> { youSection = 1; goTo(Tab.You) }
+                        "settings" -> { youSection = 2; goTo(Tab.You) }
                         "premium" -> showPaywall = true
-                        "kicks" -> tab = Tab.Kicks
-                        "coach" -> tab = Tab.Coach
+                        "kicks" -> goTo(Tab.Kicks)
+                        "coach" -> goTo(Tab.Coach)
                     }
                 },
             )
@@ -369,15 +376,22 @@ private fun MainScaffold(
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            bottomBar = { BottomBar(tab) { tab = it } },
+            bottomBar = { BottomBar(tab) { goTo(it) } },
         ) { padding ->
-            Crossfade(
-                targetState = tab,
-                animationSpec = Motion.crossfade(),
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.padding(padding),
-                label = "tab",
-            ) { selected ->
-                when (selected) {
+                // Neighbours stay composed so the reveal is instant mid-swipe,
+                // not a blank page that pops in when the fling settles.
+                beyondViewportPageCount = 1,
+                // A full-screen overlay (Labor Mode, journal…) sits ON TOP of
+                // the pager in this Box; horizontal drags inside it would fall
+                // through and silently change the tab underneath. Freeze page
+                // swiping while any overlay is up.
+                userScrollEnabled = !(showLaborMode || showJournal ||
+                    showAppointments || showCommunity || showPaywall),
+            ) { page ->
+                when (Tab.entries[page]) {
                     Tab.Today -> HomeScreen(
                         // Resolve System to what she actually SEES right now,
                         // then toggle from that. The old check compared the
@@ -413,11 +427,11 @@ private fun MainScaffold(
                             )
                         },
                         onQuestComplete = viewModel::completeQuest,
-                        onOpenKicks = { tab = Tab.Kicks },
-                        onOpenCoach = { tab = Tab.Coach },
-                        onOpenJourney = { tab = Tab.Journey },
+                        onOpenKicks = { goTo(Tab.Kicks) },
+                        onOpenCoach = { goTo(Tab.Coach) },
+                        onOpenJourney = { goTo(Tab.Journey) },
                         onOpenAppointments = { showAppointments = true },
-                        onOpenGarden = { youSection = 0; tab = Tab.You },
+                        onOpenGarden = { youSection = 0; goTo(Tab.You) },
                         onStepsGoal = viewModel::onStepsGoalReached,
                         onOpenMenu = { drawerScope.launch { drawerState.open() } },
                         onOpenJournal = {
@@ -517,16 +531,6 @@ private fun MainScaffold(
                 }
             }
         }
-
-        // Toasts sit above the nav bar so they never cover the active tab.
-        RewardToast(
-            visible = toast != null,
-            emoji = toast?.first.orEmpty(),
-            text = toast?.second.orEmpty(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 96.dp),
-        )
 
         BadgeReveal(
             badge = revealBadge,
@@ -666,6 +670,8 @@ private fun YouTab(
                 progress = progress,
                 badgeCount = badges.size,
                 daysActive = daysActive,
+                userName = profile.name,
+                currentWeek = profile.currentWeek,
             )
         } else if (section == 1) {
             BadgesScreen(earned = badges, progress = progress)
