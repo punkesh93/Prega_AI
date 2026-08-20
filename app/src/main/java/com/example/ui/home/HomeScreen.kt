@@ -1144,6 +1144,13 @@ private fun MoodOption(
         animationSpec = Motion.playful(),
         label = "moodRing",
     )
+    // Springs OVERSHOOT: on deselect (1 -> 0) the value briefly dips BELOW
+    // zero before settling, and a negative number fed into padding() or
+    // border() throws IllegalArgumentException and takes the whole Today
+    // screen down — the exact crash captured by the flight recorder
+    // (HomeScreen.kt MoodOption: "Padding must be non-negative"). Clamp
+    // once, use everywhere below.
+    val ringSafe = ring.coerceIn(0f, 1.5f)
     // The chosen face springs forward — a small, alive moment, not a bounce
     // house. Unselected faces step back slightly so the choice reads at a
     // glance even before the ring lands.
@@ -1165,11 +1172,11 @@ private fun MoodOption(
     ) {
         Box(contentAlignment = Alignment.Center) {
             // Soft radial glow behind the chosen face.
-            if (ring > 0f) {
+            if (ringSafe > 0f) {
                 Box(
                     Modifier
                         .size(58.dp)
-                        .graphicsLayer { alpha = ring * 0.8f }
+                        .graphicsLayer { alpha = (ringSafe * 0.8f).coerceIn(0f, 1f) }
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -1189,13 +1196,13 @@ private fun MoodOption(
                         scaleY = scale
                     }
                     .then(
-                        if (ring > 0f) Modifier.border(
-                            width = (2 * ring).dp,
+                        if (ringSafe > 0f) Modifier.border(
+                            width = (2 * ringSafe).dp,
                             color = PregaTheme.colors.sage,
                             shape = CircleShape,
                         ) else Modifier
                     )
-                    .padding((3 * ring).dp)
+                    .padding((3 * ringSafe).dp)
                     .clip(CircleShape)
                     .background(circleTints[index % circleTints.size]),
                 contentAlignment = Alignment.Center,
