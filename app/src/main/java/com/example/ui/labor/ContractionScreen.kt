@@ -146,14 +146,15 @@ fun ContractionScreen(
             activeContraction?.takeIf { elapsedSec(it, System.currentTimeMillis()) > 120 }?.id
         )
     }
-    if (resumePromptFor != null && activeContraction?.id == resumePromptFor) {
+    val promptTarget = activeContraction
+    if (resumePromptFor != null && promptTarget != null && promptTarget.id == resumePromptFor) {
         AlertDialog(
             onDismissRequest = { resumePromptFor = null },
             title = { Text("A contraction was still running") },
             text = {
                 Text(
                     "The timer kept its place while the app was away — it has been " +
-                        "${fmtSpan(elapsedSec(activeContraction, now))} since it started. " +
+                        "${fmtSpan(elapsedSec(promptTarget, now))} since it started. " +
                         "Continue timing it, or end it now?"
                 )
             },
