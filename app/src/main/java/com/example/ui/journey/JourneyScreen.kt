@@ -333,8 +333,9 @@ private fun HighlightsCard(info: WeekInfo) {
     ) {
         Overline("This week's highlights")
         Spacer(Modifier.height(Space.sm))
-        HighlightRow("🌱", "Growing", info.description)
-        Spacer(Modifier.height(Space.sm))
+        // The "Growing" row used to repeat info.description — the exact
+        // sentence sitting in the hero directly above it, twice on one
+        // screen. The hero owns growth; highlights now add only what's new.
         HighlightRow("💛", "You might notice", extras.notice)
         Spacer(Modifier.height(Space.sm))
         HighlightRow("🕊️", "A gentle tip", extras.tip)
