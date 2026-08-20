@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import com.example.ui.components.*
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
@@ -170,6 +172,7 @@ private fun JoinCard(dueDate: String, onJoin: (String) -> Unit) {
 @Composable
 private fun ClubHome(profile: CommunityProfile, currentWeek: Int) {
     var section by rememberSaveable { mutableStateOf("Chat") }
+    val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.padding(horizontal = Space.gutter),
@@ -178,6 +181,31 @@ private fun ClubHome(profile: CommunityProfile, currentWeek: Int) {
             listOf("Chat", "Posts", "Circles").forEach { s ->
                 PregaChip(label = s, selected = section == s, onClick = { section = s })
             }
+            Spacer(Modifier.weight(1f))
+            // Growth loop, phase 1: every member is an inviter. The share
+            // sheet reaches WhatsApp/SMS where Indian mothers actually are.
+            PregaChip(
+                label = "Invite \uD83D\uDC8C",
+                selected = false,
+                onClick = {
+                    AppStats.log(StatEvent.CommunityInviteSent)
+                    runCatching {
+                        val text = "Join my ${prettyMonth(profile.dueMonth)} birth club on " +
+                            "Prega AI — mothers due the same month, chatting and helping " +
+                            "each other through it. Free download: " +
+                            "https://punkesh93.github.io/Prega_AI/"
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                },
+                                "Invite to your birth club",
+                            )
+                        )
+                    }
+                },
+            )
         }
         Spacer(Modifier.height(Space.sm))
         when (section) {
@@ -382,6 +410,7 @@ private fun CirclesSection(profile: CommunityProfile) {
                     PregaButton(
                         text = "Join the call",
                         onClick = {
+                            AppStats.log(StatEvent.CircleJoinTapped)
                             runCatching {
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW, "https://meet.jit.si/${c.jitsiRoom}".toUri())

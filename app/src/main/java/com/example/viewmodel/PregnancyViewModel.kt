@@ -481,6 +481,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             val current = profile.value ?: return@launch
             if (current.chatLanguage == lang) return@launch
             repository.saveUserProfile(current.copy(chatLanguage = lang))
+            AppStats.log(StatEvent.LanguageChanged, param = lang)
             refreshSuggestedQuestions(force = true)
         }
     }

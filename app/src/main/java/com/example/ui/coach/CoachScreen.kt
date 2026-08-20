@@ -356,6 +356,7 @@ private fun Composer(
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Prega…")
         }
         try {
+            com.example.stats.AppStats.log(com.example.stats.StatEvent.VoiceInput)
             speechLauncher.launch(intent)
         } catch (_: ActivityNotFoundException) {
             // No recognizer on this device — typing still works; stay silent.

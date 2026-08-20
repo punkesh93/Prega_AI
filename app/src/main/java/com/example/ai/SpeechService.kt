@@ -69,6 +69,7 @@ object PregaSpeech {
 
     private suspend fun speak(context: Context, text: String) {
         if (!OpenRouterClient.isConfigured) return
+        com.example.stats.AppStats.log(com.example.stats.StatEvent.TtsListen)
         stop()
         val key = keyOf(text)
         _state.value = State.Loading(key)

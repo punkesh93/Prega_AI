@@ -28,11 +28,32 @@ import com.google.firebase.analytics.FirebaseAnalytics
  * so the old AppOpen enum entry is gone rather than double-counted.
  */
 enum class StatEvent(val wireName: String) {
+    // Core feature usage
     CoachQuestionAsked("coach_question_asked"),
     JournalSaved("journal_saved"),
     KickSessionCompleted("kick_session_completed"),
     PremiumPurchased("premium_purchased"),
     GardenShared("garden_shared"),
+
+    // Health of the app itself
+    /** Logged when a launch finds a crash report from the previous run —
+     *  the KPI: crash-affected launches / total (auto) launches. */
+    AppCrashRecovered("app_crash_recovered"),
+    UpdateShown("update_prompt_shown"),
+    UpdateTapped("update_tapped"),
+
+    // Voice & language (are the differentiators actually used?)
+    TtsListen("tts_listen"),
+    VoiceInput("voice_input_used"),
+    LanguageChanged("chat_language_changed"),
+
+    // Community funnel: joined -> active -> social
+    CommunityJoined("community_joined"),
+    CommunityMessageSent("community_message_sent"),
+    CommunityPostShared("community_post_shared"),
+    CircleHosted("circle_hosted"),
+    CircleJoinTapped("circle_join_tapped"),
+    CommunityInviteSent("community_invite_sent"),
 }
 
 object AppStats {
@@ -48,8 +69,15 @@ object AppStats {
         }
     }
 
-    /** Fire-and-forget. Safe to call from anywhere, any thread. Never throws. */
-    fun log(event: StatEvent) {
-        runCatching { analytics?.logEvent(event.wireName, null) }
+    /** Fire-and-forget. Safe to call from anywhere, any thread. Never throws.
+     *  [param] allows ONE coarse label (e.g. language name) — never content
+     *  she wrote, per the contract above. */
+    fun log(event: StatEvent, param: String? = null) {
+        runCatching {
+            val bundle = param?.let {
+                android.os.Bundle().apply { putString("label", it.take(36)) }
+            }
+            analytics?.logEvent(event.wireName, bundle)
+        }
     }
 }

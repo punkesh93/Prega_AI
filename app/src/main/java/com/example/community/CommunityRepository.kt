@@ -1,5 +1,7 @@
 package com.example.community
 
+import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import com.example.ui.coach.containsRedFlag
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -89,6 +91,7 @@ object CommunityRepository {
             .set(mapOf("name" to clubName), com.google.firebase.firestore.SetOptions.merge()).await()
         db.collection("clubs").document(dueMonth).collection("members").document(id)
             .set(mapOf("handle" to clean, "joinedAt" to FieldValue.serverTimestamp())).await()
+        AppStats.log(StatEvent.CommunityJoined)
         CommunityProfile(uid = id, handle = clean, dueMonth = dueMonth)
     }.getOrNull()
 
@@ -172,7 +175,8 @@ object CommunityRepository {
                     "hidden" to false,
                     "createdAt" to FieldValue.serverTimestamp(),
                 )
-            ).await(); true
+            ).await()
+            AppStats.log(StatEvent.CommunityMessageSent); true
         }.getOrDefault(false)
 
     suspend fun sharePost(club: String, profile: CommunityProfile, week: Int, body: String): Boolean =
@@ -189,7 +193,8 @@ object CommunityRepository {
                     "hidden" to false,
                     "createdAt" to FieldValue.serverTimestamp(),
                 )
-            ).await(); true
+            ).await()
+            AppStats.log(StatEvent.CommunityPostShared); true
         }.getOrDefault(false)
 
     suspend fun hostCircle(club: String, profile: CommunityProfile, title: String, startsAtMillis: Long): Boolean =
@@ -206,7 +211,8 @@ object CommunityRepository {
                     "jitsiRoom" to room,
                     "createdAt" to FieldValue.serverTimestamp(),
                 )
-            ).await(); true
+            ).await()
+            AppStats.log(StatEvent.CircleHosted); true
         }.getOrDefault(false)
 
     suspend fun block(otherUid: String): Boolean = runCatching {

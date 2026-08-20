@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import com.example.ui.components.*
 import com.example.ui.theme.Motion
 import com.example.ui.theme.PregaTheme
@@ -120,6 +122,12 @@ fun HomeScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
+        item {
+            // Local date key: throttles the once-a-day update check without
+            // threading a new field through HomeState.
+            UpdateCard(todayDate = remember { java.time.LocalDate.now().toString() })
+        }
+
         item {
             Reveal(0) {
                 HomeHeader(
@@ -1406,3 +1414,76 @@ private fun dueMonthLabelFor(dueDate: String?, currentWeek: Int): String? = runC
     date.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) +
         " " + date.year
 }.getOrNull()
+
+/**
+ * "A fresh version is ready" — appears only when a genuinely newer build is
+ * published (see UpdateChecker), one tap downloads it, X dismisses that
+ * release forever. Checked once per day, everything-fails-silent.
+ */
+@Composable
+private fun UpdateCard(todayDate: String) {
+    val context = LocalContext.current
+    var tag by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(todayDate) {
+        tag = com.example.update.UpdateChecker.updateAvailable(context, todayDate)
+        if (tag != null) AppStats.log(StatEvent.UpdateShown)
+    }
+    val current = tag ?: return
+
+    PregaCard(containerColor = PregaTheme.colors.sageSoft, border = false) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("\uD83C\uDF31", fontSize = 24.sp)
+            Spacer(Modifier.width(Space.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "A fresh version of Prega AI is ready",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = PregaTheme.colors.ink,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "One tap to download — installs over the top, everything stays.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkMuted,
+                )
+                Spacer(Modifier.height(Space.sm))
+                Row {
+                    Text(
+                        "Update now",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                AppStats.log(StatEvent.UpdateTapped)
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(
+                                                com.example.update.UpdateChecker.APK_URL
+                                            ),
+                                        )
+                                    )
+                                }
+                            }
+                            .padding(vertical = 4.dp, horizontal = Space.sm),
+                    )
+                    Spacer(Modifier.width(Space.sm))
+                    Text(
+                        "Later",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PregaTheme.colors.inkFaint,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                com.example.update.UpdateChecker.dismiss(context, current)
+                                tag = null
+                            }
+                            .padding(vertical = 4.dp, horizontal = Space.sm),
+                    )
+                }
+            }
+        }
+    }
+}

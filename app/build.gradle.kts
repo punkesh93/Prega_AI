@@ -26,6 +26,17 @@ android {
     versionCode = 1
     versionName = "1.0"
 
+    // The app's own git hash, baked in at build time so the in-app update
+    // checker can compare itself against the latest GitHub Release tag
+    // (build-<hash>). Colab always builds from a real clone, so git is
+    // available; anything else falls back to "dev" and the checker no-ops.
+    val gitHash = runCatching {
+        providers.exec {
+            commandLine("git", "rev-parse", "--short=7", "HEAD")
+        }.standardOutput.asText.get().trim()
+    }.getOrDefault("dev")
+    buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     // Room schema export — lets us write migration tests against real

@@ -51,6 +51,7 @@ import com.example.data.PregnancyRepository
 import com.example.notifications.NotificationChannels
 import com.example.notifications.NotificationScheduler
 import com.example.stats.AppStats
+import com.example.stats.StatEvent
 import com.example.ui.PregnancyApp
 import com.example.ui.onboarding.GoogleSignInStatus
 import com.example.ui.theme.PregaTheme
@@ -95,6 +96,9 @@ class MainActivity : ComponentActivity() {
         // check runs before every other line of init on purpose.
         val crashFile = java.io.File(filesDir, PregaApplication.CRASH_FILE)
         if (crashFile.exists()) {
+            // KPI: crash-affected launches (vs Firebase's automatic total).
+            AppStats.init(this)
+            AppStats.log(StatEvent.AppCrashRecovered)
             val trace = runCatching { crashFile.readText() }
                 .getOrDefault("(crash file unreadable)")
             setContent { CrashReportScreen(trace) { crashFile.delete(); recreate() } }
