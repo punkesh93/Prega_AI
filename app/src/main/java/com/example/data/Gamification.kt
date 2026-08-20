@@ -229,11 +229,30 @@ data class AppointmentEntity(
 data class ContractionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val startTime: Long,
+    /** -1 while the contraction is IN PROGRESS. Absolute timestamps + this
+     *  sentinel are what make the timer survive backgrounding, interruptions,
+     *  and full process death: elapsed time is always recomputed from
+     *  startTime, never stored as a running counter. */
     val durationSeconds: Int,
-    /** Gap since the previous contraction started, in seconds. */
+    /** Start-to-start gap since the previous contraction, in seconds. */
     val intervalSeconds: Int = 0,
-    /** 1..3 — mild, moderate, strong. */
+    /** 1..3 — mild, moderate, strong. (Reserved; no UI in v1 — calm.) */
     val intensity: Int = 2,
+    /** Groups contractions into timing sessions; = session startedAt. */
+    val sessionId: Long = 0,
+)
+
+/**
+ * A contraction-timing session. The row's existence with endedAt == null IS
+ * the "session active" state — persisted in Room so a locked phone, an
+ * interruption, or a restart at 2 AM changes nothing (the definition-of-done
+ * scenario for this feature). One active session at a time by query contract.
+ */
+@Entity(tableName = "contraction_sessions")
+data class ContractionSessionEntity(
+    /** Epoch millis when the session began; doubles as the session id. */
+    @PrimaryKey val startedAt: Long,
+    val endedAt: Long? = null,
 )
 
 @Entity(tableName = "weight_logs")

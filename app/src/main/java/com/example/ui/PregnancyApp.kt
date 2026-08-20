@@ -265,6 +265,7 @@ private fun MainScaffold(
     var showJournal by rememberSaveable { mutableStateOf(false) }
     var showAppointments by rememberSaveable { mutableStateOf(false) }
     var showCommunity by rememberSaveable { mutableStateOf(false) }
+    var showLaborMode by rememberSaveable { mutableStateOf(false) }
     // Hoisted so the drawer can land on a SPECIFIC section — with the state
     // private to YouTab, "Settings" in the menu could only ever reach the
     // tab's front door (the garden), which is the routing bug reported.
@@ -308,9 +309,10 @@ private fun MainScaffold(
     // Back now means "one step out": overlay -> close it; non-home tab ->
     // home; home -> the system exits as normal.
     androidx.activity.compose.BackHandler(
-        enabled = showJournal || showAppointments || showCommunity || showPaywall || tab != Tab.Today,
+        enabled = showLaborMode || showJournal || showAppointments || showCommunity || showPaywall || tab != Tab.Today,
     ) {
         when {
+            showLaborMode -> showLaborMode = false
             showJournal -> showJournal = false
             showAppointments -> showAppointments = false
             showCommunity -> showCommunity = false
@@ -432,16 +434,55 @@ private fun MainScaffold(
                         babyName = profile.babyNamePlaceholder,
                     )
 
-                    Tab.Kicks -> KickCounterScreen(
-                        isCounting = isCounting,
-                        sessionKicks = sessionKicks,
-                        sessionSeconds = sessionSeconds,
-                        history = kickLogs,
-                        onStart = viewModel::startKickSession,
-                        onKick = viewModel::logKick,
-                        onStop = viewModel::stopAndSaveKickSession,
-                        onCancel = viewModel::cancelKickSession,
-                    )
+                    Tab.Kicks -> {
+                        // Two signals share this surface: kicks (daily) and
+                        // contractions (late pregnancy). A chip keeps each
+                        // one-handed and uncluttered — and keeps both OFF the
+                        // Home screen, per the "Today, gently" rule.
+                        var kicksMode by rememberSaveable { mutableStateOf("Kicks") }
+                        val activeContractionSession by viewModel.activeContractionSession.collectAsStateWithLifecycle()
+                        val activeContraction by viewModel.activeContraction.collectAsStateWithLifecycle()
+                        val sessionContractions by viewModel.sessionContractions.collectAsStateWithLifecycle()
+                        Column(Modifier.fillMaxSize()) {
+                            Row(
+                                Modifier.padding(horizontal = com.example.ui.theme.Space.gutter),
+                                horizontalArrangement = Arrangement.spacedBy(com.example.ui.theme.Space.sm),
+                            ) {
+                                listOf("Kicks", "Contractions").forEach { m ->
+                                    com.example.ui.components.PregaChip(
+                                        label = m,
+                                        selected = kicksMode == m,
+                                        onClick = { kicksMode = m },
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(com.example.ui.theme.Space.sm))
+                            if (kicksMode == "Kicks") {
+                                KickCounterScreen(
+                                    isCounting = isCounting,
+                                    sessionKicks = sessionKicks,
+                                    sessionSeconds = sessionSeconds,
+                                    history = kickLogs,
+                                    onStart = viewModel::startKickSession,
+                                    onKick = viewModel::logKick,
+                                    onStop = viewModel::stopAndSaveKickSession,
+                                    onCancel = viewModel::cancelKickSession,
+                                )
+                            } else {
+                                com.example.ui.labor.ContractionScreen(
+                                    contractions = sessionContractions,
+                                    sessionStartedAt = activeContractionSession?.startedAt,
+                                    activeContraction = activeContraction,
+                                    onStartContraction = viewModel::startContraction,
+                                    onStopContraction = viewModel::stopContraction,
+                                    onEndSession = viewModel::endContractionSession,
+                                    onDelete = viewModel::deleteContraction,
+                                    onAdjust = viewModel::adjustContractionDuration,
+                                    onEnterLaborMode = { showLaborMode = true },
+                                )
+                            }
+                        }
+                    }
 
                     Tab.Coach -> {
                         val dynamicSuggestions by viewModel.suggestedQuestions.collectAsStateWithLifecycle()
@@ -520,6 +561,28 @@ private fun MainScaffold(
                 onSave = viewModel::saveJournalEntry,
                 onDelete = viewModel::deleteJournalEntry,
                 onBack = { showJournal = false },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showLaborMode,
+            enter = Motion.riseIn(),
+            exit = Motion.riseOut(),
+        ) {
+            val activeContractionSession by viewModel.activeContractionSession.collectAsStateWithLifecycle()
+            val activeContraction by viewModel.activeContraction.collectAsStateWithLifecycle()
+            val sessionContractions by viewModel.sessionContractions.collectAsStateWithLifecycle()
+            com.example.ui.labor.LaborModeScreen(
+                contractions = sessionContractions,
+                sessionStartedAt = activeContractionSession?.startedAt,
+                activeContraction = activeContraction,
+                onStartContraction = viewModel::startContraction,
+                onStopContraction = viewModel::stopContraction,
+                onEndSession = {
+                    viewModel.endContractionSession()
+                    showLaborMode = false
+                },
+                onClose = { showLaborMode = false },
             )
         }
 

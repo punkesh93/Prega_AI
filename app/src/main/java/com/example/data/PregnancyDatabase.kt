@@ -244,6 +244,31 @@ interface PregnancyDao {
     @Query("DELETE FROM contractions")
     suspend fun deleteAllContractions()
 
+    // ── Contraction sessions (labor timing) ──
+    @Query("SELECT * FROM contraction_sessions WHERE endedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    fun activeContractionSession(): Flow<ContractionSessionEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContractionSession(session: ContractionSessionEntity)
+
+    @Query("UPDATE contraction_sessions SET endedAt = :endedAt WHERE startedAt = :sessionId")
+    suspend fun endContractionSession(sessionId: Long, endedAt: Long)
+
+    @Query("SELECT * FROM contractions WHERE sessionId = :sessionId ORDER BY startTime ASC")
+    fun contractionsForSession(sessionId: Long): Flow<List<ContractionEntity>>
+
+    @Query("SELECT * FROM contractions WHERE durationSeconds = -1 ORDER BY startTime DESC LIMIT 1")
+    fun activeContraction(): Flow<ContractionEntity?>
+
+    @Query("UPDATE contractions SET durationSeconds = :duration WHERE durationSeconds = -1")
+    suspend fun finishActiveContraction(duration: Int)
+
+    @Query("UPDATE contractions SET durationSeconds = :duration WHERE id = :id")
+    suspend fun setContractionDuration(id: Int, duration: Int)
+
+    @Query("DELETE FROM contractions WHERE id = :id")
+    suspend fun deleteContraction(id: Int)
+
     // Weight
     @Query("SELECT * FROM weight_logs ORDER BY date ASC")
     fun getWeights(): Flow<List<WeightEntity>>
@@ -268,10 +293,11 @@ interface PregnancyDao {
         MoodEntity::class,
         AppointmentEntity::class,
         ContractionEntity::class,
+        ContractionSessionEntity::class,
         WeightEntity::class,
         JournalEntity::class,
     ],
-    version = 7,
+    version = 8,
     // Schemas are exported to app/schemas so migrations can be tested against
     // real historical schemas rather than written blind.
     exportSchema = true,

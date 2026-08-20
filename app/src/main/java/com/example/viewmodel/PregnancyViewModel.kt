@@ -351,6 +351,75 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     }
 
     // --- Kick Counter Operations ---
+    // ─── Contraction timing (labor) ────────────────────────────────────
+    // All state derives from Room timestamps — nothing counts in memory, so
+    // backgrounding, interruptions and process death cannot corrupt a
+    // session (the 2 AM contract). One active session / one active
+    // contraction at a time, both defined by queries, not flags.
+
+    val activeContractionSession = repository.activeContractionSession()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val activeContraction = repository.activeContraction()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val sessionContractions = repository.activeContractionSession()
+        .flatMapLatest { session ->
+            session?.let { repository.contractionsForSession(it.startedAt) }
+                ?: kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Starts a contraction; opens a session first if none is active. */
+    fun startContraction() {
+        viewModelScope.launch {
+            if (activeContraction.value != null) return@launch
+            val now = System.currentTimeMillis()
+            val session = activeContractionSession.value?.startedAt ?: now.also {
+                repository.startContractionSession(it)
+                AppStats.log(StatEvent.ContractionSessionStarted)
+            }
+            val prevStart = sessionContractions.value.lastOrNull()?.startTime
+            repository.saveContraction(
+                ContractionEntity(
+                    startTime = now,
+                    durationSeconds = -1,
+                    intervalSeconds = prevStart?.let { ((now - it) / 1000).toInt() } ?: 0,
+                    sessionId = session,
+                )
+            )
+        }
+    }
+
+    fun stopContraction() {
+        viewModelScope.launch {
+            val active = activeContraction.value ?: return@launch
+            val duration = ((System.currentTimeMillis() - active.startTime) / 1000)
+                .toInt().coerceAtLeast(1)
+            repository.finishActiveContraction(duration)
+        }
+    }
+
+    fun endContractionSession() {
+        viewModelScope.launch {
+            val session = activeContractionSession.value ?: return@launch
+            // Close a dangling in-progress contraction honestly first.
+            if (activeContraction.value != null) stopContraction()
+            repository.endContractionSession(session.startedAt, System.currentTimeMillis())
+        }
+    }
+
+    fun deleteContraction(id: Int) {
+        viewModelScope.launch { repository.deleteContraction(id) }
+    }
+
+    fun adjustContractionDuration(id: Int, newDurationSeconds: Int) {
+        viewModelScope.launch {
+            repository.setContractionDuration(id, newDurationSeconds.coerceIn(1, 600))
+        }
+    }
+
     fun startKickSession() {
         if (_isCountingKicks.value) return
         _isCountingKicks.value = true

@@ -54,6 +54,11 @@ enum class StatEvent(val wireName: String) {
     CircleHosted("circle_hosted"),
     CircleJoinTapped("circle_join_tapped"),
     CommunityInviteSent("community_invite_sent"),
+
+    // Labor preparation (the "2 AM release")
+    ContractionSessionStarted("contraction_session_started"),
+    LaborModeEntered("labor_mode_entered"),
+    ContractionSummaryShared("contraction_summary_shared"),
 }
 
 object AppStats {

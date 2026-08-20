@@ -61,6 +61,16 @@ class PregnancyRepository(private val dao: PregnancyDao) {
     // ── Contractions ─────────────────────────────────────────────────────
     fun getContractions(): Flow<List<ContractionEntity>> = dao.getContractions()
     suspend fun saveContraction(contraction: ContractionEntity) = dao.insertContraction(contraction)
+    fun activeContractionSession() = dao.activeContractionSession()
+    suspend fun startContractionSession(startedAt: Long) =
+        dao.insertContractionSession(ContractionSessionEntity(startedAt = startedAt))
+    suspend fun endContractionSession(sessionId: Long, endedAt: Long) =
+        dao.endContractionSession(sessionId, endedAt)
+    fun contractionsForSession(sessionId: Long) = dao.contractionsForSession(sessionId)
+    fun activeContraction() = dao.activeContraction()
+    suspend fun finishActiveContraction(duration: Int) = dao.finishActiveContraction(duration)
+    suspend fun setContractionDuration(id: Int, duration: Int) = dao.setContractionDuration(id, duration)
+    suspend fun deleteContraction(id: Int) = dao.deleteContraction(id)
     suspend fun deleteAllContractions() = dao.deleteAllContractions()
 
     // ── Weight ───────────────────────────────────────────────────────────
