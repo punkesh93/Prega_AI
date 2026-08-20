@@ -18,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -133,6 +135,7 @@ fun ContractionScreen(
     onEnterLaborMode: () -> Unit,
 ) {
     val context = LocalContextCompat()
+    val haptics = LocalHapticFeedback.current
     val now = rememberNowMs(active = activeContraction != null)
     val stats = remember(contractions, now / 1000) { computeStats(contractions, now) }
     var editing by remember { mutableStateOf<ContractionEntity?>(null) }
@@ -188,7 +191,10 @@ fun ContractionScreen(
                         color = PregaTheme.colors.ink,
                     )
                     Spacer(Modifier.height(Space.md))
-                    PregaButton(text = "It's easing — stop", onClick = onStopContraction)
+                    PregaButton(text = "It's easing — stop", onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStopContraction()
+                    })
                 } else {
                     Overline(if (sessionStartedAt == null) "Contraction timer" else "Between contractions")
                     if (sessionStartedAt != null && stats.lastEndedAgoSec != null) {
@@ -213,7 +219,10 @@ fun ContractionScreen(
                         )
                     }
                     Spacer(Modifier.height(Space.md))
-                    PregaButton(text = "Contraction starting", onClick = onStartContraction)
+                    PregaButton(text = "Contraction starting", onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStartContraction()
+                    })
                 }
             }
         }
@@ -342,6 +351,7 @@ fun LaborModeScreen(
     onClose: () -> Unit,
 ) {
     val context = LocalContextCompat()
+    val haptics = LocalHapticFeedback.current
     var provider by remember { mutableStateOf(loadProvider(context)) }
     var editProvider by remember { mutableStateOf(false) }
     val now = rememberNowMs(active = true)
@@ -349,15 +359,36 @@ fun LaborModeScreen(
 
     LaunchedEffect(Unit) { AppStats.log(StatEvent.LaborModeEntered) }
 
+    // Edge-to-edge on a near-black screen: the system clock/wifi/battery
+    // icons follow the app THEME (dark icons in light mode) and would
+    // vanish against NightInk. Flip them light while Labor Mode is visible,
+    // restore on exit. Content additionally clears both system bars.
+    val view = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(Unit) {
+        val window = generateSequence(view.context) {
+            (it as? android.content.ContextWrapper)?.baseContext
+        }.filterIsInstance<android.app.Activity>().firstOrNull()?.window
+        val controller = window?.let {
+            androidx.core.view.WindowCompat.getInsetsController(it, view)
+        }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (previous != null) controller.isAppearanceLightStatusBars = previous
+        }
+    }
+
     Column(
         Modifier
             .fillMaxSize()
             .background(NightInk)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(horizontal = Space.gutter)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(Space.xl))
+        Spacer(Modifier.height(Space.md))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "LABOR MODE",
@@ -400,7 +431,10 @@ fun LaborModeScreen(
                 .height(120.dp)
                 .clip(RoundedCornerShape(32.dp))
                 .background(if (activeContraction != null) Color(0xFFD97A84) else Color(0xFF66713A))
-                .clickable { if (activeContraction != null) onStopContraction() else onStartContraction() },
+                .clickable {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (activeContraction != null) onStopContraction() else onStartContraction()
+                },
             contentAlignment = Alignment.Center,
         ) {
             Text(

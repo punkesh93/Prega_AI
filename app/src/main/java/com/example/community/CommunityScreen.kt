@@ -73,7 +73,8 @@ fun CommunityScreen(
     Column(
         modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(),
     ) {
         Row(
             Modifier

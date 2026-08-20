@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -246,7 +247,7 @@ private fun CrashReportScreen(trace: String, onRetry: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().padding(20.dp)) {
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(20.dp)) {
                 Text(
                     "The app hit a problem last time",
                     style = MaterialTheme.typography.titleLarge,

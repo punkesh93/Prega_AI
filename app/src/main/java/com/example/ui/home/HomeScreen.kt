@@ -34,7 +34,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.material3.*
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -959,8 +961,14 @@ private fun QuestRow(quest: QuestEntity, index: Int, onComplete: (QuestEntity) -
         PregaTheme.colors.lavenderSoft,
     )
 
+    val questHaptics = LocalHapticFeedback.current
     PregaCard(
-        onClick = { if (!quest.completed) onComplete(quest) },
+        onClick = {
+            if (!quest.completed) {
+                questHaptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onComplete(quest)
+            }
+        },
         containerColor = if (quest.completed) PregaTheme.colors.recessed
         else tints[index % tints.size],
         border = false,
@@ -1130,13 +1138,17 @@ private fun QuickLog(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                val moodHaptics = LocalHapticFeedback.current
                 MOODS.forEachIndexed { i, (emoji, label) ->
                     MoodOption(
                         emoji = emoji,
                         label = label,
                         index = i,
                         selected = mood?.mood == i + 1,
-                        onClick = { onMood(i + 1) },
+                        onClick = {
+                            moodHaptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onMood(i + 1)
+                        },
                     )
                 }
             }
