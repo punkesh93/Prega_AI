@@ -403,6 +403,13 @@ private fun MainScaffold(
                         onWater = viewModel::incrementWater,
                         onVitamins = viewModel::toggleVitamins,
                         onMood = { viewModel.logMood(it) },
+                        onQuickNote = { note ->
+                            viewModel.saveJournalEntry(
+                                note = note,
+                                photoFile = "",
+                                mood = mood?.mood ?: 3,
+                            )
+                        },
                         onQuestComplete = viewModel::completeQuest,
                         onOpenKicks = { tab = Tab.Kicks },
                         onOpenCoach = { tab = Tab.Coach },

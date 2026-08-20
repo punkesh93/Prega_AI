@@ -103,6 +103,7 @@ fun HomeScreen(
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
+    onQuickNote: (String) -> Unit = {},
     onQuestComplete: (QuestEntity) -> Unit,
     onOpenKicks: () -> Unit,
     onOpenCoach: () -> Unit,
@@ -201,6 +202,24 @@ fun HomeScreen(
           }
         }
 
+        item {
+            Reveal(2) {
+                // "Today, gently" — the mockup's '72% complete' idea, rebuilt
+                // in this app's register: five soft dots, warm copy, and no
+                // percentage, no red, no guilt. An unfinished day reads as
+                // 'still open', never as failure.
+                val goal = state.profile?.waterGoalGlasses ?: 8
+                val done = listOf(
+                    state.mood != null,
+                    (state.todayLog?.waterGlasses ?: 0) >= goal,
+                    state.todayLog?.tookVitamins == true,
+                    state.quests.any { it.completed },
+                    checkedInToday,
+                ).count { it }
+                TodayGlance(done)
+            }
+        }
+
         if (!checkedInToday) {
             item { Reveal(2) { CheckInCard(onOpenJournal) } }
         }
@@ -220,9 +239,11 @@ fun HomeScreen(
                 log = state.todayLog,
                 goal = state.profile?.waterGoalGlasses ?: 8,
                 mood = state.mood,
+                checkedInToday = checkedInToday,
                 onWater = onWater,
                 onVitamins = onVitamins,
                 onMood = onMood,
+                onQuickNote = onQuickNote,
                 onStepsGoal = onStepsGoal,
             )
         }
@@ -1053,9 +1074,11 @@ private fun QuickLog(
     log: DailyLogEntity?,
     goal: Int,
     mood: MoodEntity?,
+    checkedInToday: Boolean,
     onWater: () -> Unit,
     onVitamins: () -> Unit,
     onMood: (Int) -> Unit,
+    onQuickNote: (String) -> Unit,
     onStepsGoal: () -> Unit,
 ) {
     Column {
@@ -1138,6 +1161,69 @@ private fun QuickLog(
                         index = i,
                         selected = mood?.mood == i + 1,
                         onClick = { onMood(i + 1) },
+                    )
+                }
+            }
+            // Inline check-in (from the design-inspiration mockup): once a
+            // mood is chosen, one optional line completes the whole daily
+            // check-in without leaving Home. Disappears once today is kept.
+            AnimatedVisibility(visible = selectedIndex != null && !checkedInToday) {
+                Column {
+                    Spacer(Modifier.height(Space.md))
+                    var quickNote by remember { mutableStateOf("") }
+                    OutlinedTextField(
+                        value = quickNote,
+                        onValueChange = { quickNote = it.take(300) },
+                        placeholder = { Text("One line about today (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2,
+                        shape = MaterialTheme.shapes.medium,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = PregaTheme.colors.hairline,
+                            unfocusedContainerColor = PregaTheme.colors.cardSurface,
+                            focusedContainerColor = PregaTheme.colors.cardSurface,
+                        ),
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { onQuickNote(quickNote.trim()) }) {
+                            Text("Keep today \uD83C\uDF38")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Five soft dots + warm copy; the day's gentle score without a scoreboard. */
+@Composable
+private fun TodayGlance(done: Int) {
+    PregaCard(border = false) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Overline("Today, gently")
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    when (done) {
+                        0 -> "The day is still wide open"
+                        5 -> "A full, gentle day \uD83C\uDF38"
+                        else -> "$done of 5 gentle things done"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = PregaTheme.colors.ink,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(5) { i ->
+                    Box(
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (i < done) PregaTheme.colors.sage
+                                else PregaTheme.colors.hairline
+                            ),
                     )
                 }
             }
