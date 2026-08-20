@@ -303,7 +303,42 @@ fun HomeScreen(
             item { AppointmentCard(it, onOpenAppointments) }
         }
 
-        item { ProgressSection(state.progress) }
+        // The last thing Home says. It used to be a Level card — points ring,
+        // "73 points to the next level", a fire-emoji streak and grace-day
+        // counters — which meant every scroll ENDED on a scoreboard. That
+        // block violated the ratified identity outright ("no XP / levels /
+        // streak pressure"), so the day now closes the way it opened: gently.
+        item { GentleClose() }
+    }
+}
+
+/**
+ * Home's quiet full stop. No number, no button, nothing owed — the page ends
+ * by giving her permission to leave, which is the whole philosophy in one
+ * line. (If a future request wants "progress" here again, it should be the
+ * garden itself, never a counter.)
+ */
+@Composable
+private fun GentleClose() {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = Space.md, bottom = Space.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("\uD83C\uDF3F", fontSize = 18.sp)
+        Spacer(Modifier.height(Space.xs))
+        Text(
+            "That's everything for today.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = PregaTheme.colors.inkMuted,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Rest is progress too.",
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
     }
 }
 
@@ -353,12 +388,17 @@ private fun ExploreGrid(
             Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
+            // Order matters: the first four visible tiles are the doors that
+            // DON'T already sit in the bottom bar (the walkthrough showed
+            // Journal and Garden hidden off-screen behind a swipe that the
+            // drawer was eating — they lead now). Tab duplicates trail as
+            // extra doors for the muscle-memory of tapping circles.
+            ExploreCell("Journal", "\uD83D\uDCD6", PregaTheme.colors.lavenderSoft, onOpenJournal)
+            ExploreCell("Visits", "\uD83D\uDCC5", PregaTheme.colors.goldSoft, onOpenAppointments)
+            ExploreCell("Garden", "\uD83C\uDF3A", PregaTheme.colors.sageSoft, onOpenGarden)
             ExploreCell("Kicks", "\uD83D\uDC63", PregaTheme.colors.sageSoft, onOpenKicks)
             ExploreCell("Ask Prega", "\uD83D\uDCAC", PregaTheme.colors.lavenderSoft, onOpenCoach)
             ExploreCell("Journey", "\uD83C\uDF31", PregaTheme.colors.terracottaSoft, onOpenJourney)
-            ExploreCell("Visits", "\uD83D\uDCC5", PregaTheme.colors.goldSoft, onOpenAppointments)
-            ExploreCell("Journal", "\uD83D\uDCD6", PregaTheme.colors.lavenderSoft, onOpenJournal)
-            ExploreCell("Garden", "\uD83C\uDF3A", PregaTheme.colors.sageSoft, onOpenGarden)
         }
     }
 }
@@ -411,26 +451,16 @@ private fun HomeHeader(
         )
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
+            // Just the greeting. The streak-and-points line that used to sit
+            // here was the locked philosophy's exact forbidden pattern —
+            // pregnancy opening on a scoreboard — and as the pinned first
+            // line of Home it was the most persistent element on screen.
+            // The garden holds all sense of growth now, wordlessly.
             Text(
                 greetingFor(name),
                 style = MaterialTheme.typography.headlineLarge,
                 color = PregaTheme.colors.ink,
             )
-            if (state.progress.currentStreak > 0 || state.progress.points > 0) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    buildString {
-                        if (state.progress.currentStreak > 0)
-                            append("\uD83C\uDF31 ${state.progress.currentStreak}-day streak")
-                        if (state.progress.currentStreak > 0 && state.progress.points > 0)
-                            append("  ·  ")
-                        if (state.progress.points > 0)
-                            append("${state.progress.points} bloom points")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = PregaTheme.colors.sage,
-                )
-            }
         }
 
         // Day/night, one tap from the home screen. The icon shows what
@@ -783,6 +813,11 @@ private fun CheckInCard(onOpenJournal: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
+                // Overline distinguishes this from the mood row further down:
+                // this one is the JOURNAL's door ("didn't I already answer
+                // that?" was a fair reading of two near-identical prompts).
+                Overline("Your journal")
+                Spacer(Modifier.height(Space.xs))
                 Text(
                     "How was today?",
                     style = MaterialTheme.typography.titleMedium,
@@ -1209,8 +1244,12 @@ private fun TodayGlance(done: Int) {
                             .size(12.dp)
                             .clip(CircleShape)
                             .background(
+                                // Unfilled dots are the SAME sage, faded —
+                                // hairline-on-dark was nearly invisible in the
+                                // walkthrough, which made five mystery dots.
+                                // Same hue also says "these will fill".
                                 if (i < done) PregaTheme.colors.sage
-                                else PregaTheme.colors.hairline
+                                else PregaTheme.colors.sage.copy(alpha = 0.28f)
                             ),
                     )
                 }
@@ -1370,7 +1409,7 @@ private fun VitaminsTile(
         )
         Spacer(Modifier.weight(1f))
         Text(
-            if (taken) "Nice one" else "Tap when you have",
+            if (taken) "Nice one" else "Tap once taken",
             style = MaterialTheme.typography.bodySmall,
             color = PregaTheme.colors.inkFaint,
         )
@@ -1416,89 +1455,6 @@ private fun AppointmentCard(appointment: AppointmentEntity, onOpen: () -> Unit) 
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ProgressSection(progress: ProgressEntity) {
-    Column {
-        SectionHeader(title = "Your progress", overline = "Level ${progress.level}")
-        Spacer(Modifier.height(Space.md))
-
-        PregaCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProgressRing(
-                    progress = progress.levelProgress,
-                    size = 84.dp,
-                    strokeWidth = 8.dp,
-                    brush = PregaTheme.colors.goldBrush,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "${progress.points}",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = PregaTheme.colors.ink,
-                        )
-                        Text(
-                            "points",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PregaTheme.colors.inkFaint,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(Space.lg))
-
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        progress.levelTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = PregaTheme.colors.ink,
-                    )
-                    progress.pointsToNextLevel?.let {
-                        Spacer(Modifier.height(Space.xxs))
-                        Text(
-                            "$it points to the next level",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PregaTheme.colors.inkMuted,
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(Space.lg))
-            HorizontalDivider(color = PregaTheme.colors.hairline)
-            Spacer(Modifier.height(Space.lg))
-
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // A live streak breathes; a broken one sits still. The flame
-                // only animates when there is something to celebrate.
-                if (progress.currentStreak > 0) {
-                    Breathing(minScale = 0.94f, maxScale = 1.06f) {
-                        Stat("🔥", "${progress.currentStreak}", "day streak")
-                    }
-                } else {
-                    Stat("🔥", "${progress.currentStreak}", "day streak")
-                }
-                Stat("🏅", "${progress.longestStreak}", "best ever")
-                // Surfaced deliberately: knowing she has grace days in hand is
-                // what stops a streak becoming a source of pressure.
-                Stat("🛡️", "${progress.streakFreezes}", "grace days")
-            }
-        }
-    }
-}
-
-@Composable
-private fun Stat(emoji: String, value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(emoji, fontSize = 18.sp)
-        Spacer(Modifier.height(Space.xs))
-        Text(value, style = MaterialTheme.typography.titleLarge, color = PregaTheme.colors.ink)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = PregaTheme.colors.inkFaint)
     }
 }
 
