@@ -147,12 +147,29 @@ fun HomeScreen(
             // pack is generated and pushed, or for any missing week, the
             // classic WeekHero renders instead — the app never blanks.
             val context = LocalContext.current
+            // NEAREST-week lookup, not exact-match: the image pack fills in
+            // batches (3 of 40 exist at first), and exact matching left the
+            // hero invisible for everyone not at precisely weeks 8/20/32 —
+            // the real "where are the baby pics?" report. Searching outward
+            // (her week, then ±1, ±2…, preferring the earlier week on ties)
+            // shows the closest stage's art today and self-sharpens as more
+            // weeks land. The text always states her TRUE week and size;
+            // the image is stylized stage art, not a measurement.
             val weekImageId = remember(state.weekInfo.week) {
-                context.resources.getIdentifier(
-                    "week%02d".format(state.weekInfo.week),
-                    "drawable",
-                    context.packageName,
-                )
+                fun idOf(w: Int): Int =
+                    if (w in 1..40) context.resources.getIdentifier(
+                        "week%02d".format(java.util.Locale.US, w),
+                        "drawable",
+                        context.packageName,
+                    ) else 0
+                var found = 0
+                for (d in 0..39) {
+                    found = idOf(state.weekInfo.week - d)
+                    if (found != 0) break
+                    found = idOf(state.weekInfo.week + d)
+                    if (found != 0) break
+                }
+                found
             }
             if (weekImageId != 0) {
                 LittleOneHero(
