@@ -55,48 +55,6 @@ import java.util.Locale
  * worth discussing with her care team.
  */
 
-// ─── Shared session math ───────────────────────────────────────────────────
-
-data class SessionStats(
-    val completed: List<ContractionEntity>,
-    val avgDurationSec: Int,
-    val avgIntervalSec: Int,
-    val lastEndedAgoSec: Int?,
-)
-
-fun computeStats(contractions: List<ContractionEntity>, nowMs: Long): SessionStats {
-    val completed = contractions.filter { it.durationSeconds >= 0 }
-    val avgDur = completed.map { it.durationSeconds }.average().takeIf { !it.isNaN() }?.toInt() ?: 0
-    val intervals = completed.map { it.intervalSeconds }.filter { it > 0 }
-    val avgInt = intervals.average().takeIf { !it.isNaN() }?.toInt() ?: 0
-    val lastEnd = completed.lastOrNull()?.let { it.startTime + it.durationSeconds * 1000L }
-    return SessionStats(
-        completed = completed,
-        avgDurationSec = avgDur,
-        avgIntervalSec = avgInt,
-        lastEndedAgoSec = lastEnd?.let { ((nowMs - it) / 1000).toInt().coerceAtLeast(0) },
-    )
-}
-
-fun fmtClock(totalSec: Int): String = "%d:%02d".format(Locale.US, totalSec / 60, totalSec % 60)
-
-fun fmtSpan(totalSec: Int): String =
-    if (totalSec < 60) "${totalSec}s"
-    else "${totalSec / 60}m ${"%02d".format(Locale.US, totalSec % 60)}s"
-
-/** One shared ticking "now", 1Hz, purely for display math. */
-@Composable
-fun rememberNowMs(active: Boolean): Long {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(active) {
-        while (true) {
-            now = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000)
-        }
-    }
-    return now
-}
-
 // ─── Provider guidance (user-entered, shown verbatim) ─────────────────────
 
 private const val PREFS = "prega_labor"
@@ -127,23 +85,12 @@ fun saveProvider(context: Context, p: ProviderInfo) {
 
 private fun shareSummary(context: Context, stats: SessionStats, sessionStart: Long) {
     AppStats.log(StatEvent.ContractionSummaryShared)
-    val started = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(sessionStart))
-    val lines = buildString {
-        appendLine("Contraction timing (Prega AI)")
-        appendLine("Session started $started")
-        appendLine("Contractions: ${stats.completed.size}")
-        if (stats.avgDurationSec > 0) appendLine("Average duration: ${fmtSpan(stats.avgDurationSec)}")
-        if (stats.avgIntervalSec > 0) appendLine("Average interval: ${fmtSpan(stats.avgIntervalSec)}")
-        appendLine()
-        stats.completed.takeLast(10).forEach {
-            val at = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it.startTime))
-            append("$at — ${fmtSpan(it.durationSeconds)}")
-            if (it.intervalSeconds > 0) append("  (${fmtSpan(it.intervalSeconds)} apart)")
-            appendLine()
-        }
-        appendLine()
-        append("Every pregnancy is different — this pattern is worth discussing with the care team.")
-    }
+    val fmt = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val lines = buildSummaryText(
+        stats = stats,
+        sessionStartLabel = fmt.format(Date(sessionStart)),
+        timeLabel = { fmt.format(Date(it)) },
+    )
     runCatching {
         context.startActivity(
             Intent.createChooser(
@@ -176,6 +123,37 @@ fun ContractionScreen(
     val stats = remember(contractions, now / 1000) { computeStats(contractions, now) }
     var editing by remember { mutableStateOf<ContractionEntity?>(null) }
 
+    // Resume rule: if this screen WAKES UP to find a contraction that has
+    // been running a long time (process was killed / phone was away), the
+    // app never silently guesses — she decides. Short-lived actives (quick
+    // app switches) resume without ceremony.
+    var resumePromptFor by remember {
+        mutableStateOf(
+            activeContraction?.takeIf { elapsedSec(it, System.currentTimeMillis()) > 120 }?.id
+        )
+    }
+    if (resumePromptFor != null && activeContraction?.id == resumePromptFor) {
+        AlertDialog(
+            onDismissRequest = { resumePromptFor = null },
+            title = { Text("A contraction was still running") },
+            text = {
+                Text(
+                    "The timer kept its place while the app was away — it has been " +
+                        "${fmtSpan(elapsedSec(activeContraction, now))} since it started. " +
+                        "Continue timing it, or end it now?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { resumePromptFor = null }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { onStopContraction(); resumePromptFor = null }) {
+                    Text("End now")
+                }
+            },
+        )
+    }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -188,7 +166,7 @@ fun ContractionScreen(
                 if (activeContraction != null) {
                     Overline("Contraction")
                     Text(
-                        fmtClock(((now - activeContraction.startTime) / 1000).toInt().coerceAtLeast(0)),
+                        fmtClock(elapsedSec(activeContraction, now)),
                         fontSize = 72.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
@@ -238,7 +216,8 @@ fun ContractionScreen(
             Spacer(Modifier.height(Space.md))
             Overline("Recent")
             Spacer(Modifier.height(Space.sm))
-            stats.completed.takeLast(10).reversed().forEach { c ->
+            stats.completed.takeLast(10).reversed().forEach { t ->
+                val c = t.entry
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -256,7 +235,7 @@ fun ContractionScreen(
                     )
                     Text(
                         fmtSpan(c.durationSeconds) +
-                            (if (c.intervalSeconds > 0) "  ·  ${fmtSpan(c.intervalSeconds)} apart" else ""),
+                            (if (t.intervalSec > 0) "  ·  ${fmtSpan(t.intervalSec)} apart" else ""),
                         style = MaterialTheme.typography.bodySmall,
                         color = PregaTheme.colors.inkMuted,
                     )
@@ -379,7 +358,7 @@ fun LaborModeScreen(
         // The one number that matters, readable across a dark room.
         if (activeContraction != null) {
             Text(
-                fmtClock(((now - activeContraction.startTime) / 1000).toInt().coerceAtLeast(0)),
+                fmtClock(elapsedSec(activeContraction, now)),
                 fontSize = 120.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
