@@ -290,8 +290,14 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     fun incrementWater() {
         viewModelScope.launch {
             val log = getOrCreateTodayLog()
-            repository.saveDailyLog(log.copy(waterGlasses = log.waterGlasses + 1))
+            val newGlasses = log.waterGlasses + 1
+            repository.saveDailyLog(log.copy(waterGlasses = newGlasses))
             award(GamificationEngine.Action.LogWater, profile.value?.currentWeek ?: 12, "Water logged")
+            // == the goal, not >=: the linkage fires exactly once, at the
+            // moment the goal is crossed, never on taps past it.
+            if (newGlasses == (profile.value?.waterGoalGlasses ?: 8)) {
+                autoCompleteQuests("log_water")
+            }
         }
     }
 
@@ -312,6 +318,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             // Only reward turning it on — un-ticking is a correction, not a failure.
             if (nowTaken) {
                 award(GamificationEngine.Action.LogVitamins, profile.value?.currentWeek ?: 12, "Vitamins logged")
+                autoCompleteQuests("log_vitamins")
             }
         }
     }
@@ -963,12 +970,35 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
             else -> 3
         }
         return when (clampWeek) {
-            in 1..3 -> WeekInfo(
-                week = clampWeek,
-                sizeName = "Tiny Atom",
-                lengthCm = 0.1,
+            // Weeks 1–3 each tell their own true story now. They previously
+            // shared one branch, so the 40-week list opened with the same
+            // sentence three times — and called week 1 "fertilization",
+            // which standard LMP counting doesn't. (Also retired "Tiny
+            // Atom": nothing here is atom-sized, and honesty scales.)
+            1 -> WeekInfo(
+                week = 1,
+                sizeName = "The Very Start",
+                lengthCm = 0.0,
                 weightGrams = 0.0,
-                description = "Fertilization occurs. The fertilized egg is journeying to your uterus to find its cozy home for the next nine months.",
+                description = "Counting begins with your last period — baby isn't here yet, but your body is already preparing the nest. This week is part of the story too.",
+                iconEmoji = "✨",
+                trimester = trimester
+            )
+            2 -> WeekInfo(
+                week = 2,
+                sizeName = "A Single Cell",
+                lengthCm = 0.01,
+                weightGrams = 0.0,
+                description = "Ovulation happens around now — and if egg meets sperm, fertilization begins one cell that already carries the whole plan of who they'll be.",
+                iconEmoji = "✨",
+                trimester = trimester
+            )
+            3 -> WeekInfo(
+                week = 3,
+                sizeName = "Tiny Cluster",
+                lengthCm = 0.01,
+                weightGrams = 0.0,
+                description = "The fertilized egg divides again and again on its journey to your uterus, arriving as a tiny ball of cells ready to settle into its home.",
                 iconEmoji = "✨",
                 trimester = trimester
             )
@@ -1325,6 +1355,7 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     fun onStepsGoalReached() {
         val week = profile.value?.currentWeek ?: return
         award(GamificationEngine.Action.StepsGoal, week, "A gentle walk done")
+        autoCompleteQuests("steps_goal")
     }
 
     private fun award(
@@ -1426,9 +1457,35 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
                     date = date,
                     title = title,
                     rationale = why,
+                    autoCompleteKey = questKeyFor(title),
                 )
             }
         )
+    }
+
+    /**
+     * Bridges quests to the Quick log so one truth exists: hitting the water
+     * goal, ticking vitamins, or finishing the walk quietly completes the
+     * matching quest — she never bookkeeps the same act twice. Keys derive
+     * from the title at save time (works for AI and fallback quests alike);
+     * matching is deliberately narrow so only unambiguous quests link.
+     */
+    private fun questKeyFor(title: String): String {
+        val t = title.lowercase(java.util.Locale.US)
+        return when {
+            "water" in t || "glass" in t || "hydrat" in t -> "log_water"
+            "vitamin" in t -> "log_vitamins"
+            "walk" in t || "steps" in t -> "steps_goal"
+            else -> ""
+        }
+    }
+
+    /** Completes today's not-yet-done quests carrying [key]; no-op otherwise. */
+    private fun autoCompleteQuests(key: String) {
+        if (key.isBlank()) return
+        todayQuests.value
+            .filter { !it.completed && it.autoCompleteKey == key }
+            .forEach { completeQuest(it) }
     }
 
     /** Parses the `QUEST: ... | WHY: ...` lines the prompt asks for. */
