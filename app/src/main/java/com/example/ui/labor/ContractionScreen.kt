@@ -57,6 +57,20 @@ import java.util.Locale
 
 // ─── Provider guidance (user-entered, shown verbatim) ─────────────────────
 
+/** One shared ticking "now", 1Hz, purely for display math — the ONLY clock
+ *  in this feature. State lives in Room; this just refreshes the render. */
+@Composable
+fun rememberNowMs(active: Boolean): Long {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(active) {
+        while (true) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    return now
+}
+
 private const val PREFS = "prega_labor"
 
 data class ProviderInfo(
