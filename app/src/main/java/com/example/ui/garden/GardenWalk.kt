@@ -383,13 +383,18 @@ private fun DrawScope.drawWalkFrame(
 ) {
     val w = size.width
     val h = size.height
-    val horizon = h * 0.42f
-    val focal = w * 0.95f
+    val horizon = h * 0.40f
+    // Honest projection, two focal lengths: X from width (field of view),
+    // Y from height (so a bloom two metres ahead stands at her feet, not
+    // squashed onto the horizon — the first render preview caught exactly
+    // that with a fudge factor here).
+    val focalX = w * 0.85f
+    val focalY = h * 0.72f
     val eye = EYE_HEIGHT + bob
     val mist = Color(0xFFEFF2E4)
 
-    fun projX(wx: Float, zRel: Float) = w / 2f + (wx - camX) * focal / zRel
-    fun groundY(zRel: Float) = horizon + eye * focal / zRel * 0.32f
+    fun projX(wx: Float, zRel: Float) = w / 2f + (wx - camX) * focalX / zRel
+    fun groundY(zRel: Float) = horizon + eye * focalY / zRel
     fun fog(zRel: Float) = ((zRel - 2f) / (FAR_CLIP - 4f)).coerceIn(0f, 0.82f)
 
     rotate(degrees = roll, pivot = Offset(w / 2f, h * 0.6f)) {
@@ -405,7 +410,7 @@ private fun DrawScope.drawWalkFrame(
         drawCircle(Color(0x55E9C87A), radius = w * 0.10f, center = Offset(w * 0.78f, h * 0.15f))
 
         // Far mounds, parallaxed a whisper against her wandering.
-        val par = camX * 0.06f * focal / FAR_CLIP
+        val par = camX * 0.06f * focalX / FAR_CLIP
         drawOval(
             color = GardenSageLight.copy(alpha = 0.9f),
             topLeft = Offset(-w * 0.3f - par, horizon - h * 0.05f),
@@ -432,7 +437,7 @@ private fun DrawScope.drawWalkFrame(
 
         // The path she is on, converging to the horizon.
         val zNear = 0.8f
-        val nearHalf = PATH_HALF * focal / zNear
+        val nearHalf = PATH_HALF * focalX / zNear
         val nearY = groundY(zNear).coerceAtMost(h + 40f)
         val vanish = Offset(projX(0f, FAR_CLIP), groundY(FAR_CLIP))
         drawPath(
@@ -457,7 +462,7 @@ private fun DrawScope.drawWalkFrame(
                 val sx = projX(f.x, zRel)
                 if (sx < -w * 0.2f || sx > w * 1.2f) continue
                 val sy = groundY(zRel)
-                val sh = f.h * focal / zRel * 0.5f
+                val sh = (f.h * focalY / zRel).coerceAtMost(h * 0.62f)
                 val fogAmt = fog(zRel)
                 val petal = if (f.color == 9) GardenBadgeGold else GardenPetals[f.color]
                 drawFlower(
@@ -477,8 +482,8 @@ private fun DrawScope.drawWalkFrame(
             val zRel = 3.5f + b * 2.6f + sin(clock * 0.4f + b) * 0.8f
             val wx = sin(clock * (0.5f + b * 0.13f) + b * 2f) * 2.2f
             val sx = projX(wx, zRel)
-            val sy = groundY(zRel) - (1.1f + 0.25f * sin(clock * 1.6f + b)) * focal / zRel * 0.32f
-            val s = (focal / zRel * 0.010f).coerceIn(0.6f, 2.6f)
+            val sy = groundY(zRel) - (1.1f + 0.25f * sin(clock * 1.6f + b)) * focalY / zRel
+            val s = (focalY / zRel * 0.012f).coerceIn(0.5f, 3f)
             withTransform({
                 scale(s, s, pivot = Offset(sx, sy))
             }) {
@@ -497,7 +502,7 @@ private fun DrawScope.drawWalkFrame(
             val side = if (i % 2 == 0) -1.35f else 1.35f
             val sx = projX(side, zRel)
             val sy = groundY(zRel)
-            val s = (0.30f * focal / zRel * 0.32f).coerceIn(4f, 60f)
+            val s = (0.30f * focalY / zRel).coerceIn(6f, 90f)
             val fogAmt = fog(zRel)
             if (fogAmt < 0.7f) drawVisitor(v.id, sx, sy - s * 0.6f, s, clock + i)
         }

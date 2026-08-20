@@ -114,6 +114,7 @@ object GardenFilm {
             var muxerStarted = false
 
             val bitmap = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+            val sceneBitmap = Bitmap.createBitmap(W, SCENE_H, Bitmap.Config.ARGB_8888)
             val pixels = IntArray(W * H)
             val drawScope = CanvasDrawScope()
             val info = MediaCodec.BufferInfo()
@@ -154,7 +155,7 @@ object GardenFilm {
                 if (inIdx >= 0) {
                     val t = framesQueued / FPS.toFloat()
                     renderFrame(
-                        drawScope, bitmap, t,
+                        drawScope, bitmap, sceneBitmap, t,
                         name, week, flowers, butterflies, goldBlooms, daysActive, visitors,
                     )
                     val image = enc.getInputImage(inIdx) ?: return@withContext null
@@ -208,10 +209,17 @@ object GardenFilm {
         }
     }
 
+    // The scene keeps the live garden's 4:3 proportions (its layout is in
+    // fractions of canvas HEIGHT — on the full 9:16 frame the flowers grew
+    // into giants, caught by the render preview). It draws into its own
+    // bitmap and sits at the frame's bottom; the sky above is the title's.
+    private const val SCENE_H = (W * 3) / 4 // 540
+
     /** One film frame: cream sky, the shared garden scene, the title card. */
     private fun renderFrame(
         drawScope: CanvasDrawScope,
         bitmap: Bitmap,
+        sceneBitmap: Bitmap,
         t: Float,
         name: String,
         week: Int,
@@ -221,18 +229,17 @@ object GardenFilm {
         daysActive: Int,
         visitors: List<Visitor>,
     ) {
-        val canvas = Canvas(bitmap.asImageBitmap())
         drawScope.draw(
             density = Density(2f),
             layoutDirection = LayoutDirection.Ltr,
-            canvas = canvas,
-            size = Size(W.toFloat(), H.toFloat()),
+            canvas = Canvas(sceneBitmap.asImageBitmap()),
+            size = Size(W.toFloat(), SCENE_H.toFloat()),
         ) {
             drawRect(Color(0xFFFAF8F1))
             // The proud push-in: 1.00 -> 1.07 over the film, pivot low so
             // the camera leans INTO her flowers, never off them.
             val cam = 1f + 0.07f * easeInOut(t / SECONDS)
-            scale(cam, cam, pivot = androidx.compose.ui.geometry.Offset(W * 0.5f, H * 0.80f)) {
+            scale(cam, cam, pivot = androidx.compose.ui.geometry.Offset(W * 0.5f, SCENE_H * 0.85f)) {
                 drawGardenScene(
                     t = 1.1f + t * 1.05f, // the live garden's own gentle pace
                     flowers = flowers,
@@ -243,9 +250,12 @@ object GardenFilm {
                 )
             }
         }
+        val g0 = android.graphics.Canvas(bitmap)
+        g0.drawColor(android.graphics.Color.rgb(250, 248, 241))
+        g0.drawBitmap(sceneBitmap, 0f, (H - SCENE_H).toFloat(), null)
 
         // Title card in the sky, ink on cream — serif, like the brand.
-        val g = android.graphics.Canvas(bitmap)
+        val g = g0
         val ink = android.graphics.Color.rgb(58, 52, 42)
         val muted = android.graphics.Color.rgb(99, 90, 73)
 
@@ -276,9 +286,13 @@ object GardenFilm {
             g.drawText(text, W / 2f, y + 18f * (1f - e), p)
         }
 
+        fun fit(p: Paint, text: String, maxW: Float): Paint {
+            while (p.textSize > 20f && p.measureText(text) > maxW) p.textSize -= 2f
+            return p
+        }
         val title =
             if (name.isBlank()) "My Bloom Garden" else "$name's Bloom Garden"
-        line(title, 0.9f, H * 0.155f, textPaint(58f, bold = true, alpha = 255))
+        line(title, 0.9f, H * 0.155f, fit(textPaint(58f, bold = true, alpha = 255), title, W * 0.90f))
         val stats = buildString {
             if (week > 0) append("Week $week  \u00B7  ")
             append("$flowers bloom${if (flowers == 1) "" else "s"}")
@@ -286,9 +300,9 @@ object GardenFilm {
                 append("  \u00B7  $daysActive day${if (daysActive == 1) "" else "s"} of showing up")
             }
         }
-        line(stats, 2.4f, H * 0.205f, Paint().apply {
+        line(stats, 2.4f, H * 0.205f, fit(Paint().apply {
             color = muted; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 30f
-        })
+        }, stats, W * 0.92f))
         line(
             "\u201CGrown one gentle day at a time.\u201D",
             4.4f, H * 0.265f,
