@@ -38,6 +38,7 @@ import com.example.ui.components.SectionHeader
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
 import kotlin.math.cos
+import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -69,6 +70,8 @@ fun GardenScreen(
     progress: ProgressEntity,
     badgeCount: Int,
     daysActive: Int = 0,
+    userName: String = "",
+    currentWeek: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -78,6 +81,8 @@ fun GardenScreen(
     // a popup queue.
     val unlockedVisitors = remember(daysActive) { VisitorBook.unlocked(daysActive) }
     var revealVisitor by remember { mutableStateOf<Visitor?>(null) }
+    var walking by remember { mutableStateOf(false) }
+    var filmProgress by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(daysActive) {
         val seen = VisitorBook.seen(context)
         revealVisitor = unlockedVisitors.firstOrNull { it.id !in seen }
@@ -92,8 +97,9 @@ fun GardenScreen(
     val butterflies = ((progress.currentStreak + 2) / 3).coerceIn(0, 4)
     val goldBlooms = badgeCount.coerceAtMost(3)
 
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
@@ -122,18 +128,67 @@ fun GardenScreen(
         Spacer(Modifier.height(Space.md))
 
         val shareContext = androidx.compose.ui.platform.LocalContext.current
+        val filmScope = androidx.compose.runtime.rememberCoroutineScope()
+
+        // Walking is the garden's primary act; sharing is its echo. One pink
+        // pill only — the Contractions screen already taught us what two
+        // equal pills do to a choice.
         PregaButton(
-            text = "Share my garden",
-            onClick = {
-                shareGarden(shareContext, flowers, butterflies, goldBlooms, progress.currentStreak)
-            },
+            text = "Walk in my garden",
+            onClick = { walking = true },
         )
+        Spacer(Modifier.height(Space.sm))
+        Text(
+            if (filmProgress != null) "Making your garden film\u2026"
+            else "Share my garden as a little film \u2192",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (filmProgress != null) PregaTheme.colors.inkFaint
+            else MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clip(MaterialTheme.shapes.small)
+                .clickable(enabled = filmProgress == null) {
+                    filmProgress = 0f
+                    filmScope.launch {
+                        val film = GardenFilm.create(
+                            context = shareContext,
+                            name = userName,
+                            week = currentWeek,
+                            flowers = flowers,
+                            butterflies = butterflies,
+                            goldBlooms = goldBlooms,
+                            daysActive = daysActive,
+                            visitors = unlockedVisitors,
+                        ) { p -> filmProgress = p }
+                        filmProgress = null
+                        if (film != null) {
+                            GardenFilm.share(shareContext, film, flowers, daysActive)
+                        } else {
+                            // Encoder trouble on this device — the PNG share
+                            // is the graceful floor, never a dead tap.
+                            shareGarden(shareContext, flowers, butterflies, goldBlooms, daysActive)
+                        }
+                    }
+                }
+                .padding(vertical = 4.dp, horizontal = Space.sm),
+        )
+        filmProgress?.let { p ->
+            Spacer(Modifier.height(Space.sm))
+            com.example.ui.components.PregaProgressBar(
+                progress = p,
+                height = 4.dp,
+                modifier = Modifier.padding(horizontal = Space.xl),
+            )
+        }
 
         Spacer(Modifier.height(Space.md))
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             GardenStat("${flowers}", "blooms")
-            GardenStat("${(progress.points % 25) * 100 / 25}%", "next bud")
+            // Was "(points % 25)% next bud" — a progress meter to the next
+            // reward, the exact mechanic the identity forbids. Days in bloom
+            // is the same pride with no target: it only ever counts up.
+            GardenStat("$daysActive", if (daysActive == 1) "day in bloom" else "days in bloom")
             GardenStat("$butterflies", if (butterflies == 1) "butterfly" else "butterflies")
         }
 
@@ -141,8 +196,8 @@ fun GardenScreen(
 
         PregaCard(containerColor = PregaTheme.colors.sageSoft, border = false) {
             Text(
-                "Every point you earn — water logged, quests done, days you simply " +
-                    "open the app — grows this garden. It never wilts and never " +
+                "Water logged, quests done, days you simply show up \u2014 " +
+                    "this garden grows with you. It never wilts and never " +
                     "resets. It only ever grows.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = PregaTheme.colors.ink,
@@ -150,13 +205,14 @@ fun GardenScreen(
         }
 
         Spacer(Modifier.height(Space.lg))
-        SectionHeader(title = "Visitors", overline = "They come when you keep coming")
+        SectionHeader(title = "Visitors", overline = "The garden makes friends over time")
         Spacer(Modifier.height(Space.md))
         VisitorShelf(daysActive = daysActive)
 
         Spacer(Modifier.height(Space.xl))
     }
 
+    // First-person stroll through her own blooms — over everything.
     // The arrival moment: cream card, the creature drawn LIVE (it idles in
     // its reveal, same code as the garden), name and bio, tap to welcome.
     revealVisitor?.let { v ->
@@ -167,6 +223,18 @@ fun GardenScreen(
                 revealVisitor = null
             },
         )
+    }
+
+    // First-person stroll through her own blooms — over everything.
+    if (walking) {
+        GardenWalk(
+            flowers = flowers,
+            butterflies = butterflies,
+            goldBlooms = goldBlooms,
+            visitors = unlockedVisitors,
+            onClose = { walking = false },
+        )
+    }
     }
 }
 
@@ -199,7 +267,7 @@ private fun VisitorShelf(daysActive: Int) {
                     )
                     Text(
                         if (here) v.bio
-                        else "Arrives after ${v.daysNeeded} active days",
+                        else "Arrives after ${v.daysNeeded} days in the garden",
                         style = MaterialTheme.typography.bodySmall,
                         color = PregaTheme.colors.inkFaint,
                         maxLines = 3,
@@ -310,13 +378,29 @@ private fun GardenStat(value: String, label: String) {
 
 // ─── The living canvas ─────────────────────────────────────────────────────
 
-private data class Bloom(
+internal data class Bloom(
     val xFrac: Float,
     val height: Float,
     val baseInset: Float,
     val color: Int,      // 0..3 pastel index, 9 = gold badge bloom
     val phase: Float,
 )
+
+// Palette shared by the live canvas, the PNG share, and the garden film —
+// one set of colours so her garden is HER garden on every surface.
+internal val GardenSageLight = Color(0xFFE9EDDA)
+internal val GardenSageDeep = Color(0xFFD6E0C1)
+internal val GardenStem = Color(0xFF7A8A50)
+internal val GardenLeaf = Color(0xFF8C9E60)
+internal val GardenPetals = listOf(
+    Color(0xFFD87A84), // rose
+    Color(0xFFD9A441), // gold
+    Color(0xFFC5BADE), // lavender
+    Color(0xFFE29478), // terracotta
+)
+internal val GardenBadgeGold = Color(0xFFE3B23C)
+internal val GardenCentre = Color(0xFFF7E6C4)
+internal val GardenBud = Color(0xFFB2C084)
 
 @Composable
 private fun GardenCanvas(
@@ -326,21 +410,6 @@ private fun GardenCanvas(
     visitors: List<Visitor> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    // Deterministic layout: the same garden every time she opens it. Seeded
-    // positions, front-to-back, so new flowers join without rearranging hers.
-    val blooms = remember(flowers, goldBlooms) {
-        val rnd = Random(42)
-        List(18) { i ->
-            Bloom(
-                xFrac = 0.06f + (i % 9) * 0.105f + rnd.nextFloat() * 0.03f,
-                height = 0.22f + rnd.nextFloat() * 0.22f + if (i % 3 == 0) 0.08f else 0f,
-                baseInset = rnd.nextFloat() * 0.10f,
-                color = if (i < goldBlooms) 9 else i % 4,
-                phase = rnd.nextFloat() * 6.28f,
-            )
-        }
-    }
-
     val transition = rememberInfiniteTransition(label = "garden")
     val t by transition.animateFloat(
         initialValue = 0f,
@@ -349,87 +418,123 @@ private fun GardenCanvas(
         label = "gardenClock",
     )
 
-    val sageLight = Color(0xFFE9EDDA)
-    val sageDeep = Color(0xFFD6E0C1)
-    val stem = Color(0xFF7A8A50)
-    val leaf = Color(0xFF8C9E60)
-    val petals = listOf(
-        Color(0xFFD87A84), // rose
-        Color(0xFFD9A441), // gold
-        Color(0xFFC5BADE), // lavender
-        Color(0xFFE29478), // terracotta
-    )
-    val badgeGold = Color(0xFFE3B23C)
-    val centre = Color(0xFFF7E6C4)
-    val budGreen = Color(0xFFB2C084)
-
     Canvas(modifier) {
-        // Sky: a barely-there vertical wash so the scene has air, not a void.
-        drawRect(
-            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                0f to Color(0x00FFFFFF),
-                1f to sageLight.copy(alpha = 0.35f),
-            ),
-        )
-        // Far mound: a third depth plane behind the two existing ones.
-        drawOval(
-            color = sageLight.copy(alpha = 0.55f),
-            topLeft = Offset(size.width * 0.28f, size.height * 0.55f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.9f, size.height * 0.5f),
-        )
-        // Ground: two overlapping sage mounds.
-        drawOval(
-            color = sageLight,
-            topLeft = Offset(-size.width * 0.2f, size.height * 0.62f),
-            size = androidx.compose.ui.geometry.Size(size.width * 1.4f, size.height * 0.8f),
-        )
-        drawOval(
-            color = sageDeep,
-            topLeft = Offset(-size.width * 0.3f, size.height * 0.78f),
-            size = androidx.compose.ui.geometry.Size(size.width * 1.6f, size.height * 0.9f),
-        )
+        drawGardenScene(t, flowers, butterflies, goldBlooms, visitors)
+    }
+}
 
-        // Flowers that have bloomed, plus the next one as a bud.
-        blooms.forEachIndexed { i, b ->
-            val baseY = size.height * (0.86f - b.baseInset)
-            val x = size.width * b.xFrac
-            val h = size.height * b.height
-            when {
-                i < flowers -> drawFlower(
-                    x, baseY, h,
-                    sway = sin(t + b.phase) * 0.05f,
-                    petalColor = if (b.color == 9) badgeGold else petals[b.color],
-                    breathe = 1f + 0.03f * sin(t * 2f + b.phase),
-                    stem = stem, leaf = leaf, centre = centre,
-                )
-                i == flowers -> drawBud(x, baseY, h * 0.6f, stem, budGreen)
-                // Beyond the bud: open soil, quietly waiting.
-            }
+/**
+ * The whole garden as one parametric drawing — sky, mounds, blooms, bud,
+ * butterflies, visitors — animated by clock [t]. Extracted so the live
+ * canvas, the PNG share and the garden FILM are literally the same garden;
+ * before this, the share path kept its own near-copy that had already
+ * drifted. [petalFall] >= 0 adds a layer of slowly falling petals for the
+ * film (its 0..1 clock); the live screen keeps its sky clear.
+ */
+internal fun DrawScope.drawGardenScene(
+    t: Float,
+    flowers: Int,
+    butterflies: Int,
+    goldBlooms: Int,
+    visitors: List<Visitor> = emptyList(),
+    petalFall: Float = -1f,
+) {
+    // Deterministic layout: the same garden every time she opens it. Seeded
+    // positions, front-to-back, so new flowers join without rearranging hers.
+    val rnd = Random(42)
+    val blooms = List(18) { i ->
+        Bloom(
+            xFrac = 0.06f + (i % 9) * 0.105f + rnd.nextFloat() * 0.03f,
+            height = 0.22f + rnd.nextFloat() * 0.22f + if (i % 3 == 0) 0.08f else 0f,
+            baseInset = rnd.nextFloat() * 0.10f,
+            color = if (i < goldBlooms) 9 else i % 4,
+            phase = rnd.nextFloat() * 6.28f,
+        )
+    }
+
+    // Sky: a barely-there vertical wash so the scene has air, not a void.
+    drawRect(
+        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+            0f to Color(0x00FFFFFF),
+            1f to GardenSageLight.copy(alpha = 0.35f),
+        ),
+    )
+    // Far mound: a third depth plane behind the two existing ones.
+    drawOval(
+        color = GardenSageLight.copy(alpha = 0.55f),
+        topLeft = Offset(size.width * 0.28f, size.height * 0.55f),
+        size = androidx.compose.ui.geometry.Size(size.width * 0.9f, size.height * 0.5f),
+    )
+    // Ground: two overlapping sage mounds.
+    drawOval(
+        color = GardenSageLight,
+        topLeft = Offset(-size.width * 0.2f, size.height * 0.62f),
+        size = androidx.compose.ui.geometry.Size(size.width * 1.4f, size.height * 0.8f),
+    )
+    drawOval(
+        color = GardenSageDeep,
+        topLeft = Offset(-size.width * 0.3f, size.height * 0.78f),
+        size = androidx.compose.ui.geometry.Size(size.width * 1.6f, size.height * 0.9f),
+    )
+
+    // Flowers that have bloomed, plus the next one as a bud.
+    blooms.forEachIndexed { i, b ->
+        val baseY = size.height * (0.86f - b.baseInset)
+        val x = size.width * b.xFrac
+        val h = size.height * b.height
+        when {
+            i < flowers -> drawFlower(
+                x, baseY, h,
+                sway = sin(t + b.phase) * 0.05f,
+                petalColor = if (b.color == 9) GardenBadgeGold else GardenPetals[b.color],
+                breathe = 1f + 0.03f * sin(t * 2f + b.phase),
+                stem = GardenStem, leaf = GardenLeaf, centre = GardenCentre,
+            )
+            i == flowers -> drawBud(x, baseY, h * 0.6f, GardenStem, GardenBud)
+            // Beyond the bud: open soil, quietly waiting.
         }
+    }
 
-        // Butterflies fly slow figure-eights while a streak is alive.
-        repeat(butterflies) { b ->
-            val cx = size.width * (0.25f + b * 0.18f)
-            val cy = size.height * 0.24f
-            val bx = cx + sin(t + b * 1.7f) * size.width * 0.10f
-            val by = cy + sin(2f * (t + b * 1.7f)) * size.height * 0.05f
-            drawButterfly(bx, by, flap = sin(t * 6f + b) * 0.4f + 0.8f)
-        }
+    // Butterflies fly slow figure-eights while a streak is alive.
+    repeat(butterflies) { b ->
+        val cx = size.width * (0.25f + b * 0.18f)
+        val cy = size.height * 0.24f
+        val bx = cx + sin(t + b * 1.7f) * size.width * 0.10f
+        val by = cy + sin(2f * (t + b * 1.7f)) * size.height * 0.05f
+        drawButterfly(bx, by, flap = sin(t * 6f + b) * 0.4f + 0.8f)
+    }
 
-        // Visitors, placed at seeded spots front-to-back. Depth is the
-        // dioramic trick: farther creatures sit higher on the mound and
-        // draw smaller, closer ones larger — the eye reads distance.
-        visitors.forEachIndexed { i, v ->
-            val depth = listOf(0.9f, 0.5f, 1.0f, 0.6f, 0.75f, 0.55f, 0.95f, 0.8f)[i % 8]
-            val xf = listOf(0.14f, 0.68f, 0.42f, 0.82f, 0.58f, 0.26f, 0.72f, 0.30f)[i % 8]
-            val baseY = size.height * (0.70f + 0.18f * depth)
-            val scale = size.height * 0.035f * (0.65f + 0.55f * depth)
-            drawVisitor(v.id, size.width * xf, baseY, scale, t + i * 1.3f)
+    // Visitors, placed at seeded spots front-to-back. Depth is the
+    // dioramic trick: farther creatures sit higher on the mound and
+    // draw smaller, closer ones larger — the eye reads distance.
+    visitors.forEachIndexed { i, v ->
+        val depth = listOf(0.9f, 0.5f, 1.0f, 0.6f, 0.75f, 0.55f, 0.95f, 0.8f)[i % 8]
+        val xf = listOf(0.14f, 0.68f, 0.42f, 0.82f, 0.58f, 0.26f, 0.72f, 0.30f)[i % 8]
+        val baseY = size.height * (0.70f + 0.18f * depth)
+        val scale = size.height * 0.035f * (0.65f + 0.55f * depth)
+        drawVisitor(v.id, size.width * xf, baseY, scale, t + i * 1.3f)
+    }
+
+    // Falling petals — the film's romance layer.
+    if (petalFall >= 0f) {
+        val prnd = Random(7)
+        repeat(10) { i ->
+            val px = prnd.nextFloat()
+            val phase = prnd.nextFloat()
+            val sz = size.width * (0.010f + prnd.nextFloat() * 0.012f)
+            val progress = (petalFall + phase) % 1f
+            val y = progress * (size.height * 0.9f)
+            val x = px * size.width + sin(progress * 9f + i) * size.width * 0.03f
+            drawOval(
+                color = GardenPetals[i % 4].copy(alpha = 0.28f),
+                topLeft = Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(sz, sz * 0.62f),
+            )
         }
     }
 }
 
-private fun DrawScope.drawFlower(
+internal fun DrawScope.drawFlower(
     x: Float, baseY: Float, h: Float,
     sway: Float, petalColor: Color, breathe: Float,
     stem: Color, leaf: Color, centre: Color,
@@ -487,7 +592,7 @@ private fun DrawScope.drawFlower(
     )
 }
 
-private fun DrawScope.drawBud(x: Float, baseY: Float, h: Float, stem: Color, bud: Color) {
+internal fun DrawScope.drawBud(x: Float, baseY: Float, h: Float, stem: Color, bud: Color) {
     drawPath(
         Path().apply {
             moveTo(x, baseY)
@@ -503,7 +608,7 @@ private fun DrawScope.drawBud(x: Float, baseY: Float, h: Float, stem: Color, bud
     )
 }
 
-private fun DrawScope.drawButterfly(x: Float, y: Float, flap: Float) {
+internal fun DrawScope.drawButterfly(x: Float, y: Float, flap: Float) {
     val rose = Color(0xFFD87A84)
     val terra = Color(0xFFE29478)
     val body = Color(0xFF5A503C)
@@ -527,25 +632,12 @@ private fun shareGarden(
     flowers: Int,
     butterflies: Int,
     goldBlooms: Int,
-    streak: Int,
+    daysActive: Int,
 ) {
     val w = 1080
     val h = 810
     val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = androidx.compose.ui.graphics.Canvas(bitmap.asImageBitmap())
-
-    val blooms = run {
-        val rnd = Random(42)
-        List(18) { i ->
-            Bloom(
-                xFrac = 0.06f + (i % 9) * 0.105f + rnd.nextFloat() * 0.03f,
-                height = 0.22f + rnd.nextFloat() * 0.22f + if (i % 3 == 0) 0.08f else 0f,
-                baseInset = rnd.nextFloat() * 0.10f,
-                color = if (i < goldBlooms) 9 else i % 4,
-                phase = rnd.nextFloat() * 6.28f,
-            )
-        }
-    }
 
     androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
         density = androidx.compose.ui.unit.Density(2.5f),
@@ -553,47 +645,10 @@ private fun shareGarden(
         canvas = canvas,
         size = androidx.compose.ui.geometry.Size(w.toFloat(), h.toFloat()),
     ) {
-        // Cream backdrop for a standalone image.
+        // Cream backdrop for a standalone image, then the one true garden —
+        // the exact scene function the live screen and the film draw.
         drawRect(Color(0xFFFAF8F1))
-        val sageLight = Color(0xFFE9EDDA)
-        val sageDeep = Color(0xFFD6E0C1)
-        val stem = Color(0xFF7A8A50)
-        val leaf = Color(0xFF8C9E60)
-        val petals = listOf(
-            Color(0xFFD87A84), Color(0xFFD9A441), Color(0xFFC5BADE), Color(0xFFE29478),
-        )
-        drawOval(
-            color = sageLight,
-            topLeft = Offset(-size.width * 0.2f, size.height * 0.62f),
-            size = androidx.compose.ui.geometry.Size(size.width * 1.4f, size.height * 0.8f),
-        )
-        drawOval(
-            color = sageDeep,
-            topLeft = Offset(-size.width * 0.3f, size.height * 0.78f),
-            size = androidx.compose.ui.geometry.Size(size.width * 1.6f, size.height * 0.9f),
-        )
-        blooms.forEachIndexed { i, b ->
-            val baseY = size.height * (0.86f - b.baseInset)
-            val x = size.width * b.xFrac
-            val hh = size.height * b.height
-            when {
-                i < flowers -> drawFlower(
-                    x, baseY, hh,
-                    sway = sin(b.phase) * 0.04f,
-                    petalColor = if (b.color == 9) Color(0xFFE3B23C) else petals[b.color],
-                    breathe = 1f,
-                    stem = stem, leaf = leaf, centre = Color(0xFFF7E6C4),
-                )
-                i == flowers -> drawBud(x, baseY, hh * 0.6f, stem, Color(0xFFB2C084))
-            }
-        }
-        repeat(butterflies) { b ->
-            drawButterfly(
-                size.width * (0.25f + b * 0.18f),
-                size.height * (0.20f + (b % 2) * 0.08f),
-                flap = 0.9f,
-            )
-        }
+        drawGardenScene(t = 1.3f, flowers = flowers, butterflies = butterflies, goldBlooms = goldBlooms)
     }
 
     // Title + stamp drawn INTO the image, so the share stands alone on any
@@ -616,7 +671,7 @@ private fun shareGarden(
         }
         val subtitle = buildString {
             append("$flowers flower${if (flowers == 1) "" else "s"}")
-            if (streak > 0) append("  ·  $streak-day streak")
+            if (daysActive > 0) append("  ·  $daysActive day${if (daysActive == 1) "" else "s"} in bloom")
         }
         g.drawText(subtitle, 50f, 150f, sub)
         val foot = android.graphics.Paint().apply {
@@ -638,7 +693,7 @@ private fun shareGarden(
     )
     val text = buildString {
         append("My self-care garden — $flowers flowers and counting 🌸\n")
-        if (streak > 0) append("$streak-day streak\n")
+        if (daysActive > 0) append("$daysActive day${if (daysActive == 1) "" else "s"} in bloom\n")
         append("\nGrown with Prega AI")
     }
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
