@@ -541,11 +541,19 @@ private fun MainScaffold(
         ) {
             val appts by viewModel.appointments.collectAsStateWithLifecycle()
             val today by viewModel.todayDate.collectAsStateWithLifecycle()
+            val doctorQuestions by viewModel.doctorQuestions.collectAsStateWithLifecycle()
             com.example.ui.appointments.AppointmentsScreen(
                 appointments = appts,
                 todayDate = today,
+                questions = doctorQuestions,
                 onSave = viewModel::saveAppointment,
                 onDelete = viewModel::deleteAppointment,
+                onAddQuestion = viewModel::addDoctorQuestion,
+                onToggleAnswered = viewModel::toggleQuestionAnswered,
+                onEditQuestion = viewModel::editDoctorQuestion,
+                onArchiveQuestion = viewModel::archiveDoctorQuestion,
+                onDeleteQuestion = viewModel::deleteDoctorQuestion,
+                onBuildPrep = { since -> viewModel.buildAppointmentPrep(since) },
                 onBack = { showAppointments = false },
             )
         }

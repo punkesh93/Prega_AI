@@ -351,6 +351,103 @@ class PregnancyViewModel(private val repository: PregnancyRepository) : ViewMode
     }
 
     // --- Kick Counter Operations ---
+    // ─── Doctor questions + appointment prep ──────────────────────────
+    // Questions are durable (they roll forward until answered/archived);
+    // the prep summary is DERIVED on demand from data the app already holds
+    // — deterministic local compilation, no AI, works offline, and per the
+    // product rule SHE reviews and controls every section before sharing.
+
+    val doctorQuestions = repository.doctorQuestions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addDoctorQuestion(text: String) {
+        val clean = text.trim().take(300)
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            repository.upsertDoctorQuestion(
+                DoctorQuestionEntity(text = clean, createdAt = System.currentTimeMillis())
+            )
+            AppStats.log(StatEvent.DoctorQuestionSaved)
+        }
+    }
+
+    fun editDoctorQuestion(q: DoctorQuestionEntity, newText: String) {
+        val clean = newText.trim().take(300)
+        if (clean.isEmpty()) return
+        viewModelScope.launch { repository.upsertDoctorQuestion(q.copy(text = clean)) }
+    }
+
+    fun toggleQuestionAnswered(q: DoctorQuestionEntity) {
+        viewModelScope.launch {
+            repository.upsertDoctorQuestion(
+                q.copy(answeredAt = if (q.answeredAt == null) System.currentTimeMillis() else null)
+            )
+        }
+    }
+
+    fun archiveDoctorQuestion(q: DoctorQuestionEntity) {
+        viewModelScope.launch { repository.upsertDoctorQuestion(q.copy(archived = true)) }
+    }
+
+    fun deleteDoctorQuestion(id: Int) {
+        viewModelScope.launch { repository.deleteDoctorQuestion(id) }
+    }
+
+    /** Everything the prep sheet can offer — she toggles what makes the cut. */
+    data class AppointmentPrep(
+        val weekLine: String,
+        val symptomLines: List<String>,
+        val moodLine: String?,
+        val movementLine: String?,
+        val waterLine: String?,
+        val openQuestions: List<String>,
+        val lastVisitLine: String?,
+    )
+
+    suspend fun buildAppointmentPrep(sinceDate: String?): AppointmentPrep {
+        val p = profile.value
+        val logs = repository.getAllDailyLogs().first()
+            .filter { sinceDate == null || it.date > sinceDate }
+            .take(30)
+        val symptomCounts = logs
+            .flatMap { it.symptoms.split(",").map(String::trim).filter(String::isNotEmpty) }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .take(5)
+            .map { (name, n) -> if (n > 1) "$name \u00D7 $n" else name }
+        val moods = repository.getRecentMoods(60).first()
+            .filter { sinceDate == null || it.date > sinceDate }
+        val moodLine = moods.takeIf { it.isNotEmpty() }?.let { list ->
+            val avg = list.map { it.mood }.average()
+            "Mostly " + when {
+                avg >= 4 -> "good days"
+                avg >= 3 -> "steady, with ups and downs"
+                else -> "harder days than usual"
+            } + " (${list.size} check-ins)"
+        }
+        val kicks = kickLogs.value.filter { sinceDate == null || it.date > sinceDate }
+        val movementLine = kicks.takeIf { it.isNotEmpty() }
+            ?.let { "${it.size} movement sessions logged" }
+        val waterAvg = logs.map { it.waterGlasses }.filter { it > 0 }
+            .takeIf { it.isNotEmpty() }?.average()
+        val waterLine = waterAvg?.let { "Water: averaging %.1f glasses/day".format(java.util.Locale.US, it) }
+        return AppointmentPrep(
+            weekLine = "Week ${p?.currentWeek ?: 0} of pregnancy",
+            symptomLines = symptomCounts,
+            moodLine = moodLine,
+            movementLine = movementLine,
+            waterLine = waterLine,
+            openQuestions = doctorQuestions.value.filter { it.answeredAt == null }.map { it.text },
+            lastVisitLine = appointments.value
+                .filter { it.date < (sinceDate ?: "9999") || sinceDate == null }
+                .filter { it.completed || it.date < todayDateString() }
+                .maxByOrNull { it.date }
+                ?.let { "Last visit: ${it.title} (${it.date})" },
+        )
+    }
+
+    private fun todayDateString(): String = _todayDate.value
+
     // ─── Contraction timing (labor) ────────────────────────────────────
     // All state derives from Room timestamps — nothing counts in memory, so
     // backgrounding, interruptions and process death cannot corrupt a

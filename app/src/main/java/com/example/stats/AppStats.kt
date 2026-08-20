@@ -59,6 +59,8 @@ enum class StatEvent(val wireName: String) {
     ContractionSessionStarted("contraction_session_started"),
     LaborModeEntered("labor_mode_entered"),
     ContractionSummaryShared("contraction_summary_shared"),
+    DoctorQuestionSaved("doctor_question_saved"),
+    AppointmentSummaryShared("appointment_summary_shared"),
 }
 
 object AppStats {

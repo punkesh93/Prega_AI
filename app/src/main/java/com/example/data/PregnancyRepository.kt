@@ -71,6 +71,9 @@ class PregnancyRepository(private val dao: PregnancyDao) {
     suspend fun finishActiveContraction(duration: Int) = dao.finishActiveContraction(duration)
     suspend fun setContractionDuration(id: Int, duration: Int) = dao.setContractionDuration(id, duration)
     suspend fun deleteContraction(id: Int) = dao.deleteContraction(id)
+    fun doctorQuestions() = dao.doctorQuestions()
+    suspend fun upsertDoctorQuestion(q: DoctorQuestionEntity) = dao.upsertDoctorQuestion(q)
+    suspend fun deleteDoctorQuestion(id: Int) = dao.deleteDoctorQuestion(id)
     suspend fun deleteAllContractions() = dao.deleteAllContractions()
 
     // ── Weight ───────────────────────────────────────────────────────────

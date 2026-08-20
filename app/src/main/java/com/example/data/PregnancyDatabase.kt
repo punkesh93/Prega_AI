@@ -269,6 +269,16 @@ interface PregnancyDao {
     @Query("DELETE FROM contractions WHERE id = :id")
     suspend fun deleteContraction(id: Int)
 
+    // ── Doctor questions ──
+    @Query("SELECT * FROM doctor_questions WHERE archived = 0 ORDER BY answeredAt IS NOT NULL, createdAt DESC")
+    fun doctorQuestions(): Flow<List<DoctorQuestionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDoctorQuestion(question: DoctorQuestionEntity)
+
+    @Query("DELETE FROM doctor_questions WHERE id = :id")
+    suspend fun deleteDoctorQuestion(id: Int)
+
     // Weight
     @Query("SELECT * FROM weight_logs ORDER BY date ASC")
     fun getWeights(): Flow<List<WeightEntity>>
@@ -294,10 +304,11 @@ interface PregnancyDao {
         AppointmentEntity::class,
         ContractionEntity::class,
         ContractionSessionEntity::class,
+        DoctorQuestionEntity::class,
         WeightEntity::class,
         JournalEntity::class,
     ],
-    version = 8,
+    version = 9,
     // Schemas are exported to app/schemas so migrations can be tested against
     // real historical schemas rather than written blind.
     exportSchema = true,

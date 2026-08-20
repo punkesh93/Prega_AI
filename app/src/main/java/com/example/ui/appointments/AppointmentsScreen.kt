@@ -15,6 +15,7 @@ import com.example.data.AppointmentEntity
 import com.example.ui.components.*
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -36,13 +37,36 @@ import java.time.ZoneId
 fun AppointmentsScreen(
     appointments: List<AppointmentEntity>,
     todayDate: String,
+    questions: List<com.example.data.DoctorQuestionEntity> = emptyList(),
     onSave: (AppointmentEntity) -> Unit,
     onDelete: (Int) -> Unit,
+    onAddQuestion: (String) -> Unit = {},
+    onToggleAnswered: (com.example.data.DoctorQuestionEntity) -> Unit = {},
+    onEditQuestion: (com.example.data.DoctorQuestionEntity, String) -> Unit = { _, _ -> },
+    onArchiveQuestion: (com.example.data.DoctorQuestionEntity) -> Unit = {},
+    onDeleteQuestion: (Int) -> Unit = {},
+    onBuildPrep: suspend (sinceDate: String?) -> com.example.viewmodel.PregnancyViewModel.AppointmentPrep? = { null },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var editing by remember { mutableStateOf<AppointmentEntity?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var prepFor by remember { mutableStateOf<AppointmentEntity?>(null) }
+    var prepData by remember {
+        mutableStateOf<com.example.viewmodel.PregnancyViewModel.AppointmentPrep?>(null)
+    }
+    val prepScope = rememberCoroutineScope()
+
+    prepFor?.let { appt ->
+        prepData?.let { data ->
+            AppointmentPrepSheet(
+                appointmentTitle = appt.title,
+                appointmentDate = appt.date,
+                prep = data,
+                onDismiss = { prepFor = null; prepData = null },
+            )
+        }
+    }
 
     val (upcoming, past) = remember(appointments, todayDate) {
         appointments.partition { it.date >= todayDate && !it.completed }
@@ -109,6 +133,51 @@ fun AppointmentsScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Space.md),
             ) {
+                upcoming.minByOrNull { it.date }?.let { next ->
+                    item {
+                        PregaCard(
+                            containerColor = PregaTheme.colors.goldSoft,
+                            border = false,
+                            onClick = {
+                                prepFor = next
+                                prepScope.launch {
+                                    // Cover the stretch since the last completed
+                                    // visit; fall back to everything recent.
+                                    val since = appointments
+                                        .filter { it.date < todayDate }
+                                        .maxByOrNull { it.date }?.date
+                                    prepData = onBuildPrep(since)
+                                }
+                            },
+                        ) {
+                            Column {
+                                Overline("Coming up \u00B7 ${next.date}")
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Prepare for ${next.title}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PregaTheme.colors.ink,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "One tap compiles what's happened since your last visit — you choose what to bring.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = PregaTheme.colors.inkMuted,
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    QuestionBankSection(
+                        questions = questions,
+                        onAdd = onAddQuestion,
+                        onToggleAnswered = onToggleAnswered,
+                        onEdit = onEditQuestion,
+                        onArchive = onArchiveQuestion,
+                        onDelete = onDeleteQuestion,
+                    )
+                }
                 if (upcoming.isNotEmpty()) {
                     item { Overline("Coming up") }
                     items(upcoming, key = { "u${it.id}" }) { appt ->

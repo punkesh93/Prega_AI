@@ -248,6 +248,22 @@ data class ContractionEntity(
  * interruption, or a restart at 2 AM changes nothing (the definition-of-done
  * scenario for this feature). One active session at a time by query contract.
  */
+/**
+ * A question she wants to ask her doctor — the seed of the care-coordination
+ * layer. Questions outlive appointments: unanswered ones roll forward to the
+ * next visit automatically; answered ones become part of her record;
+ * archived ones leave the list without being destroyed.
+ */
+@Entity(tableName = "doctor_questions")
+data class DoctorQuestionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val text: String,
+    val createdAt: Long,
+    /** Null while open; set when she marks it answered at a visit. */
+    val answeredAt: Long? = null,
+    val archived: Boolean = false,
+)
+
 @Entity(tableName = "contraction_sessions")
 data class ContractionSessionEntity(
     /** Epoch millis when the session began; doubles as the session id. */
