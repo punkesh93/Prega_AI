@@ -36,6 +36,7 @@ fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onUpdateProfile: (name: String, babyName: String, diet: String) -> Unit,
     onNotificationsChanged: (Boolean) -> Unit,
+    onSendTestReminder: () -> Unit = {},
     onWaterGoalChanged: (Int) -> Unit,
     onManageSubscription: () -> Unit,
     onUpgrade: () -> Unit,
@@ -225,6 +226,21 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = PregaTheme.colors.inkFaint,
             )
+            // The only way to know reminders work is to see one. Without this
+            // the first proof is 8:30 tomorrow — and "no notifications come"
+            // was reported with no way to tell permission-denied from
+            // not-scheduled from quiet-hours. One tap answers it.
+            if (profile.notificationsEnabled) {
+                Spacer(Modifier.height(Space.md))
+                PregaTextButton("Send a test reminder", onSendTestReminder, fillWidth = true)
+                Spacer(Modifier.height(Space.xs))
+                Text(
+                    "If nothing appears, check that notifications are allowed " +
+                        "for Prega in your phone's settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PregaTheme.colors.inkFaint,
+                )
+            }
         }
 
         Spacer(Modifier.height(Space.xl))

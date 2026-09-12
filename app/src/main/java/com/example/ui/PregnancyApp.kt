@@ -373,6 +373,14 @@ private fun MainScaffold(
             )
         },
     ) {
+    val overlayUp = showLaborMode || showJournal ||
+        showAppointments || showCommunity || showPaywall
+    // The garden's audio must follow what she SEES, not what is composed:
+    // beyondViewportPageCount keeps neighbours (and mid-swipe pages) alive,
+    // and overlays sit on top of the pager without removing it. settledPage
+    // (not currentPage) so a fling that passes over You doesn't chirp.
+    val youActive = pagerState.settledPage == Tab.You.ordinal && !overlayUp
+    val shellContext = androidx.compose.ui.platform.LocalContext.current
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -388,8 +396,7 @@ private fun MainScaffold(
                 // the pager in this Box; horizontal drags inside it would fall
                 // through and silently change the tab underneath. Freeze page
                 // swiping while any overlay is up.
-                userScrollEnabled = !(showLaborMode || showJournal ||
-                    showAppointments || showCommunity || showPaywall),
+                userScrollEnabled = !overlayUp,
             ) { page ->
                 when (Tab.entries[page]) {
                     Tab.Today -> HomeScreen(
@@ -527,6 +534,11 @@ private fun MainScaffold(
                         onThemeModeChange = onThemeModeChange,
                         section = youSection,
                         onSectionChange = { youSection = it },
+                        active = youActive,
+                        onSendTestReminder = {
+                            com.example.notifications.NotificationScheduler
+                                .sendTestNow(shellContext)
+                        },
                     )
                 }
             }
@@ -650,6 +662,8 @@ private fun YouTab(
     onThemeModeChange: (com.example.ui.theme.ThemeMode) -> Unit,
     section: Int,
     onSectionChange: (Int) -> Unit,
+    active: Boolean = true,
+    onSendTestReminder: () -> Unit = {},
 ) {
 
     Column(Modifier.fillMaxSize()) {
@@ -672,6 +686,7 @@ private fun YouTab(
                 daysActive = daysActive,
                 userName = profile.name,
                 currentWeek = profile.currentWeek,
+                active = active,
             )
         } else if (section == 1) {
             BadgesScreen(earned = badges, progress = progress)
@@ -685,6 +700,7 @@ private fun YouTab(
                     viewModel.setNotificationsEnabled(it)
                     onNotificationsToggled(it)
                 },
+                onSendTestReminder = onSendTestReminder,
                 onWaterGoalChanged = viewModel::setWaterGoal,
                 onManageSubscription = onManageSubscription,
                 onUpgrade = onUpgrade,

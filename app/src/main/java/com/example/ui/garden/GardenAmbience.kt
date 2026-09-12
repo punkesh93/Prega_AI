@@ -46,8 +46,14 @@ import com.example.ui.theme.Space
  * Waveform + spectrogram were visually verified before shipping.
  *
  * Behavior rules:
- *  - Plays only while the garden is on screen; leaving the tab stops it
- *    (players live in a DisposableEffect keyed to the composition).
+ *  - Plays only while the garden is on screen. Composition alone is NOT
+ *    the signal: the tabs live in a HorizontalPager with
+ *    beyondViewportPageCount = 1, so the You page (and this composable)
+ *    stays composed while she's on the neighbouring tab, mid-swipe, and
+ *    under every full-screen overlay — which is exactly the "sound on
+ *    every page" bug. The shell therefore passes [active] = "You is the
+ *    settled page and nothing is drawn over it"; the players only exist
+ *    while that is true.
  *  - Volumes stay low (wind 0.35, birds 0.5 of an already-quiet master) —
  *    ambience, not soundtrack.
  *  - The toggle chip persists her choice in prefs; default is ON the first
@@ -59,7 +65,7 @@ private const val PREFS = "prega_garden"
 private const val KEY_SOUND = "sound_on"
 
 @Composable
-fun GardenAmbience() {
+fun GardenAmbience(active: Boolean = true) {
     val context = LocalContext.current
     var soundOn by remember {
         mutableStateOf(
@@ -68,9 +74,9 @@ fun GardenAmbience() {
         )
     }
 
-    if (soundOn) {
+    if (soundOn && active) {
         val lifecycleOwner = LocalLifecycleOwner.current
-        DisposableEffect(lifecycleOwner) {
+        DisposableEffect(lifecycleOwner, active) {
             val players = mutableListOf<MediaPlayer>()
             fun make(res: Int, vol: Float) {
                 try {

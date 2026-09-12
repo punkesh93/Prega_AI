@@ -50,6 +50,7 @@ import com.example.data.ALL_MIGRATIONS
 import com.example.data.PregnancyDatabase
 import com.example.data.PregnancyRepository
 import com.example.notifications.NotificationChannels
+import com.example.notifications.NotificationPermission
 import com.example.notifications.NotificationScheduler
 import com.example.stats.AppStats
 import com.example.stats.StatEvent
@@ -157,6 +158,32 @@ class MainActivity : ComponentActivity() {
                     if (granted) NotificationScheduler.scheduleAll(this@MainActivity)
                 }
 
+                // Why "no notifications come": scheduleAll used to run in
+                // exactly two places — the end of onboarding and the Settings
+                // switch. Anyone who onboarded before reminders existed, or
+                // whose permission dialog was dismissed, or who granted the
+                // permission later from system settings, was never scheduled
+                // at all. Now every launch with the switch on re-applies the
+                // schedule (KEEP policy makes this idempotent — no bursts) and,
+                // on Android 13+, asks for the permission once if it's missing.
+                LaunchedEffect(profile?.onboardingComplete, profile?.notificationsEnabled) {
+                    val p = profile ?: return@LaunchedEffect
+                    if (!p.onboardingComplete || !p.notificationsEnabled) return@LaunchedEffect
+                    when {
+                        NotificationPermission.granted(this@MainActivity) ->
+                            NotificationScheduler.scheduleAll(this@MainActivity)
+                        !NotificationPermission.asked(this@MainActivity) -> {
+                            // Flag BEFORE launching: the Settings switch also
+                            // saves the profile, which re-runs this effect —
+                            // without the flag both paths would open a dialog.
+                            NotificationPermission.markAsked(this@MainActivity)
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        // Asked before and still denied: don't nag on launch.
+                        // The Settings switch is the deliberate place to retry.
+                    }
+                }
+
                 PregnancyApp(
                     viewModel = viewModel,
                     billingState = billingState,
@@ -168,10 +195,20 @@ class MainActivity : ComponentActivity() {
                     onManageSubscription = ::openPlaySubscriptions,
                     onNotificationsToggled = { enabled ->
                         if (enabled) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                NotificationScheduler.scheduleAll(this@MainActivity)
+                            when {
+                                NotificationPermission.granted(this@MainActivity) ->
+                                    NotificationScheduler.scheduleAll(this@MainActivity)
+                                // Android stops showing the dialog after two
+                                // denials — launch() then returns false
+                                // instantly and the switch looks broken. Send
+                                // her to the system page instead, where it
+                                // can actually be turned on.
+                                NotificationPermission.permanentlyDenied(this@MainActivity) ->
+                                    NotificationPermission.openSystemSettings(this@MainActivity)
+                                else -> {
+                                    NotificationPermission.markAsked(this@MainActivity)
+                                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
                             }
                         } else {
                             NotificationScheduler.cancelAll(this@MainActivity)

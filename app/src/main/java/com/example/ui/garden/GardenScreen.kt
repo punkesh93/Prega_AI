@@ -72,6 +72,8 @@ fun GardenScreen(
     daysActive: Int = 0,
     userName: String = "",
     currentWeek: Int = 0,
+    /** False while another tab is settled or an overlay covers this page — gates all audio. */
+    active: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -83,6 +85,10 @@ fun GardenScreen(
     var revealVisitor by remember { mutableStateOf<Visitor?>(null) }
     var walking by remember { mutableStateOf(false) }
     var filmProgress by remember { mutableStateOf<Float?>(null) }
+    // The walk has its own footsteps/hum players; if she swipes to another
+    // tab mid-stroll the page stays composed (pager pre-composition), so the
+    // walk — and its audio — must end with the visit, not with the composition.
+    LaunchedEffect(active) { if (!active) walking = false }
     LaunchedEffect(daysActive) {
         val seen = VisitorBook.seen(context)
         revealVisitor = unlockedVisitors.firstOrNull { it.id !in seen }
@@ -123,7 +129,7 @@ fun GardenScreen(
         }
 
         // Wind + birdsong while she's here; chip toggles and remembers.
-        GardenAmbience()
+        GardenAmbience(active = active)
 
         Spacer(Modifier.height(Space.md))
 

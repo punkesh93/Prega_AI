@@ -42,6 +42,10 @@ class PregaNotificationWorker(
         val kindName = inputData.getString(KEY_KIND) ?: return Result.success()
         val kind = runCatching { PregaPrompts.NotificationKind.valueOf(kindName) }
             .getOrNull() ?: return Result.success()
+        // A test tap from Settings: she asked for it now, so quiet hours and
+        // the once-per-day guard don't apply. Permission and the master
+        // switch still do — a test that lies about deliverability is useless.
+        val force = inputData.getBoolean(KEY_FORCE, false)
 
         val db = Room.databaseBuilder(
             context.applicationContext,
@@ -54,7 +58,7 @@ class PregaNotificationWorker(
 
         // Respect her settings before doing any work at all.
         if (!profile.notificationsEnabled) return Result.success()
-        if (inQuietHours(profile.quietHoursStart, profile.quietHoursEnd)) {
+        if (!force && inQuietHours(profile.quietHoursStart, profile.quietHoursEnd)) {
             // Not a failure — the schedule will come round again tomorrow.
             return Result.success()
         }
@@ -64,7 +68,7 @@ class PregaNotificationWorker(
         val today = LocalDate.now().toString()
 
         // Guard against duplicate sends if WorkManager re-runs the task.
-        if (history.lastSentDate(kind.name) == today && kind.isOncePerDay) {
+        if (!force && history.lastSentDate(kind.name) == today && kind.isOncePerDay) {
             return Result.success()
         }
 
@@ -73,7 +77,7 @@ class PregaNotificationWorker(
 
         post(kind, copy)
         history.record(kind.name, copy.title, copy.body)
-        history.markSent(kind.name, today)
+        if (!force) history.markSent(kind.name, today)
 
         return Result.success()
     }
@@ -192,6 +196,7 @@ class PregaNotificationWorker(
 
     companion object {
         const val KEY_KIND = "kind"
+        const val KEY_FORCE = "force"
         const val EXTRA_FROM_NOTIFICATION = "from_notification"
 
         /**

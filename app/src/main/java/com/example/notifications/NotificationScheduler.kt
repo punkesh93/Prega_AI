@@ -5,6 +5,7 @@ import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.ai.PregaPrompts
@@ -75,6 +76,32 @@ object NotificationScheduler {
         listOf(MORNING, MIDDAY, EVENING, "prega_milestone").forEach {
             wm.cancelUniqueWork(it)
         }
+    }
+
+    /**
+     * Posts one reminder right now, from Settings. Bypasses the once-a-day
+     * and quiet-hours gates (it's a deliberate tap, not a schedule) but NOT
+     * the permission or master-switch checks — so it doubles as a truthful
+     * "are reminders actually able to reach me?" probe.
+     */
+    fun sendTestNow(context: Context) {
+        NotificationChannels.registerAll(context)
+        // Plain one-time work, not expedited: pre-Android-12 expedited work
+        // demands getForegroundInfo() and throws without it. A normal request
+        // runs within seconds anyway.
+        val request = OneTimeWorkRequestBuilder<PregaNotificationWorker>()
+            .setInputData(
+                Data.Builder()
+                    .putString(
+                        PregaNotificationWorker.KEY_KIND,
+                        PregaPrompts.NotificationKind.Encouragement.name,
+                    )
+                    .putBoolean(PregaNotificationWorker.KEY_FORCE, true)
+                    .build()
+            )
+            .addTag(TAG)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
     }
 
     /** Re-applies the schedule after a settings change. */
