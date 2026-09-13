@@ -110,6 +110,19 @@ jobs:
               echo "::error::TEST: $line"
             done
           done
+          # JUnit XML has the actual exception; the console only has the name.
+          for x in app/build/test-results/testDebugUnitTest/*.xml; do
+            [ -f "$x" ] || continue
+            python3 - "$x" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          t = ET.parse(sys.argv[1]).getroot()
+          for tc in t.iter('testcase'):
+              for f in list(tc.findall('failure')) + list(tc.findall('error')):
+                  msg = (f.get('message') or '').replace('\n', ' ')[:300]
+                  trace = (f.text or '').strip().splitlines()[:3]
+                  print(f"::error::TEST {tc.get('classname')}.{tc.get('name')}: {msg} | {' / '.join(trace)}")
+          PY
+          done
 
       # The FILENAME must stay exactly prega-ai.apk: both the website
       # Download button and UpdateChecker fetch
