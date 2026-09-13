@@ -7,16 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LocalFlorist
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.LocalFlorist
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.*
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
@@ -42,6 +32,7 @@ import com.example.ui.paywall.PaywallScreen
 import com.example.ui.rewards.BadgesScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.Motion
+import com.example.ui.icons.PregaIcons
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
 import com.example.viewmodel.PregnancyViewModel
@@ -67,38 +58,20 @@ import java.time.temporal.ChronoUnit
  * Tab icons are real vectors, not emoji. Emoji render differently on every
  * manufacturer's phone and can't be tinted to reflect selection state; icons
  * from the Material set are consistent everywhere and take theme colour.
- * Filled variant when selected, outlined when not — the standard affordance.
+ * Prega's own line-art icons: the same drawing a stroke heavier when
+ * selected (they are lines, not glyphs, so a filled twin would read as a
+ * different shape).
  */
 private enum class Tab(
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val iconSelected: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
-    Today(
-        "Today",
-        Icons.Outlined.LocalFlorist,
-        Icons.Filled.LocalFlorist,
-    ),
-    Journey(
-        "Journey",
-        Icons.Outlined.Timeline,
-        Icons.Filled.Timeline,
-    ),
-    Kicks(
-        "Kicks",
-        Icons.Outlined.FavoriteBorder,
-        Icons.Filled.Favorite,
-    ),
-    Coach(
-        "Prega AI",
-        Icons.Outlined.AutoAwesome,
-        Icons.Filled.AutoAwesome,
-    ),
-    You(
-        "You",
-        Icons.Outlined.Person,
-        Icons.Filled.Person,
-    ),
+    Today("Today", PregaIcons.Today, PregaIcons.TodayBold),
+    Journey("Journey", PregaIcons.Journey, PregaIcons.JourneyBold),
+    Kicks("Kicks", PregaIcons.Kicks, PregaIcons.KicksBold),
+    Coach("Prega AI", PregaIcons.Coach, PregaIcons.CoachBold),
+    You("You", PregaIcons.You, PregaIcons.YouBold),
 }
 
 @Composable
@@ -214,15 +187,15 @@ private fun AppDrawer(
             Spacer(Modifier.height(Space.xl))
 
             listOf(
-                Triple("journal", "My journal", "📔"),
-                Triple("garden", "My garden", "🌷"),
-                Triple("appointments", "Appointments", "🗓️"),
-                Triple("kicks", "Kick counter", "👣"),
-                Triple("coach", "Ask Prega AI", "✨"),
-                Triple("badges", "Badges", "🏅"),
-                Triple("premium", "Premium", "🌸"),
-                Triple("settings", "Settings", "⚙️"),
-            ).forEach { (id, label, emoji) ->
+                Triple("journal", "My journal", PregaIcons.Journal),
+                Triple("garden", "My garden", PregaIcons.Garden),
+                Triple("appointments", "Appointments", PregaIcons.Appointments),
+                Triple("kicks", "Kick counter", PregaIcons.Kicks),
+                Triple("coach", "Ask Prega AI", PregaIcons.Coach),
+                Triple("badges", "Badges", PregaIcons.Badge),
+                Triple("premium", "Premium", PregaIcons.LittleOne),
+                Triple("settings", "Settings", PregaIcons.Settings),
+            ).forEach { (id, label, icon) ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -231,7 +204,12 @@ private fun AppDrawer(
                         .padding(vertical = Space.md, horizontal = Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(emoji, fontSize = 20.sp)
+                    androidx.compose.material3.Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = PregaTheme.colors.inkMuted,
+                        modifier = Modifier.size(22.dp),
+                    )
                     Spacer(Modifier.width(Space.md))
                     Text(
                         label,
