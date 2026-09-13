@@ -39,13 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -74,6 +68,7 @@ import kotlin.random.Random
  * nothing that can fail to load: geometry and the drawing code we already
  * trust.
  *
+ * v3 — a Japanese stroll garden (see GardenWorld.kt for the world itself).
  * v2 — a place, not a corridor. The first walk projected a straight path
  * with a fixed forward gaze; you could only go on. Now the camera has a
  * position, a heading and a pitch, the meadow is an endless deterministic
@@ -97,24 +92,16 @@ import kotlin.random.Random
  * closes into colour. Hum + breeze + birds loop; every second footfall
  * lands a soft grass press in the ear that matches the eye.
  */
-private const val EYE_HEIGHT = 1.55f       // metres
 private const val STEP_HZ = 1.7f           // unhurried steps per second
 private const val WALK_SPEED = 1.05f       // m/s — a stroll, not a hike
 private const val MAX_SPEED = 2.2f         // m/s — even a hurried drag stays a walk
 private const val BOB_AMPLITUDE = 0.045f   // metres of vertical bob
-private const val PATH_HALF = 0.85f        // metres of clear path each side
-private const val FAR_CLIP = 22f           // metres of visible world
-private const val NEAR_CLIP = 0.55f        // metres — closer than this is behind the eye
-private const val CELL = 2f                // metres per meadow cell
 private const val MAX_PITCH = 0.42f        // radians (~24°) of looking up/down
 private const val STEPS_PER_METRE = STEP_HZ / WALK_SPEED
 
 private const val PREFS = "prega_garden"
 private const val KEY_SOUND = "sound_on"
 private const val KEY_MOTION = "walk_motion_look"
-
-/** Where the path runs: a slow meander so turning reveals it curving away. */
-private fun pathX(z: Float): Float = 2.6f * sin(z / 9f) + 1.1f * sin(z / 3.7f + 1.3f)
 
 @Composable
 fun GardenWalk(
@@ -377,13 +364,14 @@ fun GardenWalk(
             viewW = size.width
             viewH = size.height
             val moving = kotlin.math.abs(speed) > 0.05f
-            drawWalkFrame(
-                clock = clock,
-                camX = camX,
-                camZ = camZ,
-                heading = heading,
-                pitch = pitch,
+            val cam = WalkCamera(
+                x = camX, z = camZ, heading = heading, pitch = pitch,
+                w = size.width, h = size.height,
                 bob = if (moving) sin(bobPhase) * BOB_AMPLITUDE else 0f,
+            )
+            drawJapaneseWalk(
+                cam = cam,
+                clock = clock,
                 roll = if (moving) sin(bobPhase * 0.5f) * 0.45f else 0f,
                 density = density,
                 goldRatio = goldRatio,
@@ -451,264 +439,6 @@ fun GardenWalk(
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFF5A503C),
                 )
-            }
-        }
-    }
-}
-
-// ─── The projected world ───────────────────────────────────────────────────
-
-private data class WalkFlower(
-    val x: Float,       // world metres
-    val z: Float,       // world metres
-    val h: Float,       // bloom height in metres
-    val color: Int,     // palette index, 9 = gold
-    val phase: Float,
-)
-
-/**
- * Deterministic flowers for meadow cell [cx],[cz] — same field on every
- * walk, in every direction, with the path kept clear. Up to four blooms
- * per 2 m cell at full density.
- */
-private fun cellFlowers(cx: Int, cz: Int, density: Float, goldRatio: Float): List<WalkFlower> {
-    val rnd = Random((cx * 73856093) xor (cz * 19349663) xor 42)
-    val out = ArrayList<WalkFlower>(4)
-    repeat(4) {
-        if (rnd.nextFloat() < density) {
-            val x = cx * CELL + rnd.nextFloat() * CELL
-            val z = cz * CELL + rnd.nextFloat() * CELL
-            if (kotlin.math.abs(x - pathX(z)) < PATH_HALF + 0.22f) return@repeat
-            out += WalkFlower(
-                x = x,
-                z = z,
-                h = 0.42f + rnd.nextFloat() * 0.34f,
-                color = if (rnd.nextFloat() < goldRatio) 9 else rnd.nextInt(4),
-                phase = rnd.nextFloat() * 6.28f,
-            )
-        }
-    }
-    return out
-}
-
-private fun mixToward(c: Color, toward: Color, amount: Float): Color = Color(
-    red = c.red + (toward.red - c.red) * amount,
-    green = c.green + (toward.green - c.green) * amount,
-    blue = c.blue + (toward.blue - c.blue) * amount,
-    alpha = c.alpha,
-)
-
-private class Projected(val sx: Float, val sy: Float, val depth: Float)
-
-/** Signed angle from the camera heading to a world bearing, in (-π, π]. */
-private fun relBearing(bearing: Float, heading: Float): Float =
-    ((bearing - heading + PI.toFloat()).mod(2f * PI.toFloat())) - PI.toFloat()
-
-private fun DrawScope.drawWalkFrame(
-    clock: Float,
-    camX: Float,
-    camZ: Float,
-    heading: Float,
-    pitch: Float,
-    bob: Float,
-    roll: Float,
-    density: Float,
-    goldRatio: Float,
-    butterflies: Int,
-    visitors: List<Visitor>,
-) {
-    val w = size.width
-    val h = size.height
-    // Honest projection, two focal lengths: X from width (field of view),
-    // Y from height (so a bloom two metres ahead stands at her feet, not
-    // squashed onto the horizon — the first render preview caught exactly
-    // that with a fudge factor here).
-    val focalX = w * 0.85f
-    val focalY = h * 0.72f
-    // Looking up moves the horizon DOWN the screen (more sky), looking
-    // down moves it up. A shifted horizon is a good approximation of a
-    // pitched camera within the ±24° we allow.
-    val horizon = h * 0.40f + kotlin.math.tan(pitch) * focalY
-    val eye = EYE_HEIGHT + bob
-    val mist = Color(0xFFEFF2E4)
-    val sinH = sin(heading)
-    val cosH = cos(heading)
-
-    // World → camera: forward along the heading, right perpendicular to it.
-    fun project(wx: Float, wz: Float): Projected? {
-        val dx = wx - camX
-        val dz = wz - camZ
-        val fwd = dx * sinH + dz * cosH
-        if (fwd < NEAR_CLIP) return null
-        val right = dx * cosH - dz * sinH
-        return Projected(
-            sx = w / 2f + right * focalX / fwd,
-            sy = horizon + eye * focalY / fwd,
-            depth = fwd,
-        )
-    }
-    fun fog(depth: Float) = ((depth - 2f) / (FAR_CLIP - 4f)).coerceIn(0f, 0.82f)
-
-    rotate(degrees = roll, pivot = Offset(w / 2f, h * 0.6f)) {
-        // Sky: dawn cream into sage, hung from the horizon so pitch moves it.
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to Color(0xFFFDF7EA),
-                0.55f to Color(0xFFF6F2E2),
-                1f to GardenSageLight,
-                startY = horizon - h * 0.9f,
-                endY = horizon,
-            ),
-            topLeft = Offset(0f, -h),
-            size = androidx.compose.ui.geometry.Size(w, horizon + h),
-        )
-        // The sun keeps a fixed bearing in the world (a little right of the
-        // way she first faced), so turning carries it across the sky and
-        // out of view — the single strongest cue that she is really turning.
-        run {
-            val rel = relBearing(0.4f, heading)
-            if (kotlin.math.abs(rel) < 1.2f) {
-                val sx = w / 2f + kotlin.math.tan(rel) * focalX
-                val sy = horizon - h * 0.25f
-                drawCircle(Color(0x33E3B23C), radius = w * 0.20f, center = Offset(sx, sy))
-                drawCircle(Color(0x55E9C87A), radius = w * 0.10f, center = Offset(sx, sy))
-            }
-        }
-
-        // Far mounds at fixed bearings all the way round, so there is
-        // always a horizon and it always moves the right way.
-        val mounds = listOf(
-            Triple(0.15f, 1.1f, 0.16f), Triple(1.35f, 0.95f, 0.13f), Triple(2.55f, 1.2f, 0.15f),
-            Triple(3.8f, 0.9f, 0.12f), Triple(4.9f, 1.05f, 0.14f), Triple(-0.95f, 0.85f, 0.12f),
-        )
-        mounds.forEachIndexed { i, (bearing, wf, hf) ->
-            val rel = relBearing(bearing, heading)
-            if (kotlin.math.abs(rel) < 1.3f) {
-                val cx = w / 2f + kotlin.math.tan(rel) * focalX
-                val mw = w * wf
-                val mh = h * hf
-                drawOval(
-                    color = if (i % 2 == 0) GardenSageLight.copy(alpha = 0.9f)
-                    else mixToward(GardenSageDeep, mist, 0.45f),
-                    topLeft = Offset(cx - mw / 2f, horizon - mh * 0.3f),
-                    size = androidx.compose.ui.geometry.Size(mw, mh),
-                )
-            }
-        }
-
-        // Ground: mist at the horizon deepening toward her feet.
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to mist,
-                0.45f to GardenSageLight,
-                1f to GardenSageDeep,
-                startY = horizon,
-                endY = h + h * 0.4f,
-            ),
-            topLeft = Offset(0f, horizon),
-            size = androidx.compose.ui.geometry.Size(w, h - horizon + h),
-        )
-
-        // The path, one metre at a time, far to near, wherever it winds —
-        // ahead, beside, or behind her once she turns round.
-        val z0 = floor(camZ).toInt() - FAR_CLIP.toInt()
-        for (zi in (z0 + 2 * FAR_CLIP.toInt()) downTo z0) {
-            val za = zi.toFloat()
-            val zb = za + 1f
-            val a = pathX(za)
-            val b = pathX(zb)
-            val p1 = project(a - PATH_HALF, za) ?: continue
-            val p2 = project(a + PATH_HALF, za) ?: continue
-            val p3 = project(b + PATH_HALF, zb) ?: continue
-            val p4 = project(b - PATH_HALF, zb) ?: continue
-            if (p1.depth > FAR_CLIP && p4.depth > FAR_CLIP) continue
-            val f = fog(minOf(p1.depth, p4.depth))
-            drawPath(
-                Path().apply {
-                    moveTo(p1.sx, p1.sy); lineTo(p2.sx, p2.sy)
-                    lineTo(p3.sx, p3.sy); lineTo(p4.sx, p4.sy); close()
-                },
-                color = mixToward(Color(0xFFEFE8D6), mist, f),
-            )
-        }
-
-        // Flowers on every side: gather the visible ones from the cells
-        // around her, sort far to near, draw with the flat garden's
-        // drawFlower — the same petals she knows, now standing around her.
-        val cells = (FAR_CLIP / CELL).toInt() + 1
-        val ccx = floor(camX / CELL).toInt()
-        val ccz = floor(camZ / CELL).toInt()
-        val visible = ArrayList<Pair<Projected, WalkFlower>>(256)
-        val halfFov = (w / 2f) / focalX
-        for (cx in ccx - cells..ccx + cells) {
-            for (cz in ccz - cells..ccz + cells) {
-                // Cheap cull on the cell centre before touching its flowers.
-                val mdx = (cx + 0.5f) * CELL - camX
-                val mdz = (cz + 0.5f) * CELL - camZ
-                val mfwd = mdx * sinH + mdz * cosH
-                if (mfwd < -CELL) continue
-                val mright = kotlin.math.abs(mdx * cosH - mdz * sinH)
-                if (mright > (mfwd + CELL * 1.5f) * halfFov * 1.4f + CELL) continue
-                for (f in cellFlowers(cx, cz, density, goldRatio)) {
-                    val p = project(f.x, f.z) ?: continue
-                    if (p.depth > FAR_CLIP) continue
-                    if (p.sx < -w * 0.2f || p.sx > w * 1.2f) continue
-                    // Beyond 12 m only every other bloom: the eye can't
-                    // tell, the frame budget can.
-                    if (p.depth > 12f && (f.phase * 10f).toInt() % 2 == 0) continue
-                    visible += p to f
-                }
-            }
-        }
-        visible.sortByDescending { it.first.depth }
-        val budget = if (visible.size > 230) visible.subList(visible.size - 230, visible.size) else visible
-        for ((p, f) in budget) {
-            val sh = (f.h * focalY / p.depth).coerceAtMost(h * 0.62f)
-            val fogAmt = fog(p.depth)
-            val petal = if (f.color == 9) GardenBadgeGold else GardenPetals[f.color]
-            drawFlower(
-                x = p.sx, baseY = p.sy, h = sh,
-                sway = sin(clock * 1.1f + f.phase) * 0.05f,
-                petalColor = mixToward(petal, mist, fogAmt),
-                breathe = 1f + 0.03f * sin(clock * 2f + f.phase),
-                stem = mixToward(GardenStem, mist, fogAmt),
-                leaf = mixToward(GardenLeaf, mist, fogAmt),
-                centre = mixToward(GardenCentre, mist, fogAmt),
-            )
-        }
-
-        // Her butterflies circle wherever she stands, each on its own
-        // orbit — turn and you find them, they don't follow the gaze.
-        repeat(butterflies.coerceIn(0, 4)) { b ->
-            val ang = clock * (0.25f + b * 0.07f) + b * 1.7f
-            val r = 3f + b * 1.4f + sin(clock * 0.4f + b) * 0.8f
-            val p = project(camX + sin(ang) * r, camZ + cos(ang) * r) ?: return@repeat
-            if (p.depth > FAR_CLIP) return@repeat
-            val sy = p.sy - (1.1f + 0.25f * sin(clock * 1.6f + b)) * focalY / p.depth
-            val s = (focalY / p.depth * 0.012f).coerceIn(0.5f, 3f)
-            withTransform({
-                scale(s, s, pivot = Offset(p.sx, sy))
-            }) {
-                drawButterfly(p.sx, sy, flap = sin(clock * 7f + b) * 0.4f + 0.8f)
-            }
-        }
-
-        // Visitor stations: every friend she has earned waits somewhere
-        // along the path, and the stations repeat every loop so a long
-        // stroll — in either direction — re-meets everyone.
-        if (visitors.isNotEmpty()) {
-            val loop = 7f + visitors.size * 7f + 14f
-            val k0 = floor((camZ - 7f) / loop).toInt()
-            visitors.forEachIndexed { i, v ->
-                val side = if (i % 2 == 0) -1.35f else 1.35f
-                for (k in k0 - 1..k0 + 1) {
-                    val wz = 7f + i * 7f + k * loop
-                    val p = project(pathX(wz) + side, wz) ?: continue
-                    if (p.depth < 0.8f || p.depth > 20f) continue
-                    val s = (0.30f * focalY / p.depth).coerceIn(6f, 90f)
-                    val fogAmt = fog(p.depth)
-                    if (fogAmt < 0.7f) drawVisitor(v.id, p.sx, p.sy - s * 0.6f, s, clock + i)
-                }
             }
         }
     }
