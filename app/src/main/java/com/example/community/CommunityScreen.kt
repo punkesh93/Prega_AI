@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.stats.AppStats
 import com.example.stats.StatEvent
 import com.example.ui.components.*
@@ -223,9 +224,20 @@ private fun ClubHome(profile: CommunityProfile, currentWeek: Int) {
 @Composable
 private fun ChatSection(profile: CommunityProfile) {
     val scope = rememberCoroutineScope()
-    val messages by CommunityRepository.messages(profile.dueMonth)
-        .collectAsState(initial = emptyList())
-    val blocked by CommunityRepository.myBlockedIds().collectAsState(initial = emptySet())
+    // The flows MUST be remembered. collectAsState keys its collection on
+    // the flow INSTANCE, and messages()/myBlockedIds() build a fresh
+    // callbackFlow on every call — so calling them inline meant every
+    // recomposition (each keystroke in the input box, most of all) tore
+    // down the Firestore listener, restarted collection at
+    // initial = emptyList(), and repainted the club empty before the
+    // snapshot came back. That is the reported flicker, and it also
+    // churned a listener per keystroke against the free Firestore quota.
+    val messagesFlow = remember(profile.dueMonth) {
+        CommunityRepository.messages(profile.dueMonth)
+    }
+    val blockedFlow = remember(profile.uid) { CommunityRepository.myBlockedIds() }
+    val messages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val blocked by blockedFlow.collectAsStateWithLifecycle(initialValue = emptySet())
     val visible = remember(messages, blocked) { messages.filter { it.authorId !in blocked } }
     var input by remember { mutableStateOf("") }
 
@@ -308,9 +320,10 @@ private fun ChatSection(profile: CommunityProfile) {
 @Composable
 private fun PostsSection(profile: CommunityProfile) {
     val scope = rememberCoroutineScope()
-    val posts by CommunityRepository.posts(profile.dueMonth)
-        .collectAsState(initial = emptyList())
-    val blocked by CommunityRepository.myBlockedIds().collectAsState(initial = emptySet())
+    val postsFlow = remember(profile.dueMonth) { CommunityRepository.posts(profile.dueMonth) }
+    val blockedFlow = remember(profile.uid) { CommunityRepository.myBlockedIds() }
+    val posts by postsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val blocked by blockedFlow.collectAsStateWithLifecycle(initialValue = emptySet())
     val visible = remember(posts, blocked) { posts.filter { it.authorId !in blocked } }
 
     if (visible.isEmpty()) {
@@ -380,8 +393,8 @@ private fun PostsSection(profile: CommunityProfile) {
 private fun CirclesSection(profile: CommunityProfile) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val circles by CommunityRepository.circles(profile.dueMonth)
-        .collectAsState(initial = emptyList())
+    val circlesFlow = remember(profile.dueMonth) { CommunityRepository.circles(profile.dueMonth) }
+    val circles by circlesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var hosting by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
