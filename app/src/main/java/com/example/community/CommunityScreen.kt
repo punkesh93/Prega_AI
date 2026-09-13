@@ -2,6 +2,7 @@ package com.example.community
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +31,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.stats.AppStats
 import com.example.stats.StatEvent
 import com.example.ui.components.*
+import com.example.ui.theme.BloomRoseDeep
+import com.example.ui.theme.BloomRoseSoft
+import com.example.ui.theme.BloomRoseWhisper
 import com.example.ui.theme.PregaTheme
 import com.example.ui.theme.Space
 import kotlinx.coroutines.launch
@@ -170,59 +175,158 @@ private fun JoinCard(dueDate: String, onJoin: (String) -> Unit) {
 
 // ─── Club home ─────────────────────────────────────────────────────────────
 
+/**
+ * The one growth loop the community has: every member is an inviter, and
+ * the share sheet reaches WhatsApp/SMS where Indian mothers actually are.
+ * Shared by the header chip and the new-club empty state so the message
+ * can never drift between them.
+ */
+private fun inviteToClub(context: android.content.Context, dueMonth: String) {
+    AppStats.log(StatEvent.CommunityInviteSent)
+    runCatching {
+        val text = "Join my ${prettyMonth(dueMonth)} birth club on " +
+            "Prega AI — mothers due the same month, chatting and helping " +
+            "each other through it. Free download: " +
+            "https://punkesh93.github.io/Prega_AI/"
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, text)
+                },
+                "Invite to your birth club",
+            )
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ClubHome(profile: CommunityProfile, currentWeek: Int) {
     var section by rememberSaveable { mutableStateOf("Chat") }
     val context = LocalContext.current
+    // Who is here. Discoverability is cohort-only by design, so a brand-new
+    // club is EMPTY — and an empty room with no explanation reads as
+    // broken. The member row makes the size honest ("Just you so far") and
+    // the chat's empty state turns that into the invite.
+    val membersFlow = remember(profile.dueMonth) { CommunityRepository.members(profile.dueMonth) }
+    val members by membersFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+
     Column(Modifier.fillMaxSize()) {
+        MembersRow(
+            handles = members,
+            me = profile.handle,
+            modifier = Modifier.padding(horizontal = Space.gutter),
+        )
+        Spacer(Modifier.height(Space.md))
         Row(
             Modifier.padding(horizontal = Space.gutter),
             horizontalArrangement = Arrangement.spacedBy(Space.sm),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             listOf("Chat", "Posts", "Circles").forEach { s ->
                 PregaChip(label = s, selected = section == s, onClick = { section = s })
             }
             Spacer(Modifier.weight(1f))
-            // Growth loop, phase 1: every member is an inviter. The share
-            // sheet reaches WhatsApp/SMS where Indian mothers actually are.
-            PregaChip(
-                label = "Invite \uD83D\uDC8C",
-                selected = false,
-                onClick = {
-                    AppStats.log(StatEvent.CommunityInviteSent)
-                    runCatching {
-                        val text = "Join my ${prettyMonth(profile.dueMonth)} birth club on " +
-                            "Prega AI — mothers due the same month, chatting and helping " +
-                            "each other through it. Free download: " +
-                            "https://punkesh93.github.io/Prega_AI/"
-                        context.startActivity(
-                            Intent.createChooser(
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, text)
-                                },
-                                "Invite to your birth club",
-                            )
-                        )
-                    }
-                },
-            )
+            InviteChip { inviteToClub(context, profile.dueMonth) }
         }
         Spacer(Modifier.height(Space.sm))
         when (section) {
-            "Chat" -> ChatSection(profile)
+            "Chat" -> ChatSection(
+                profile = profile,
+                memberCount = members.size,
+                onInvite = { inviteToClub(context, profile.dueMonth) },
+            )
             "Posts" -> PostsSection(profile)
             else -> CirclesSection(profile)
         }
     }
 }
 
+/** Overlapping initials plus an honest count. No presence — we don't have it. */
+@Composable
+private fun MembersRow(handles: List<String>, me: String, modifier: Modifier = Modifier) {
+    val shown = remember(handles, me) {
+        // Her own initial first, then the others in join order.
+        (listOf(me) + handles.filter { it != me }).take(5)
+    }
+    val tints = listOf(
+        PregaTheme.colors.sageSoft to PregaTheme.colors.sage,
+        PregaTheme.colors.terracottaSoft to PregaTheme.colors.terracotta,
+        PregaTheme.colors.lavenderSoft to PregaTheme.colors.lavender,
+        PregaTheme.colors.goldSoft to PregaTheme.colors.gold,
+    )
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        // Overlap by hand: offset() moves pixels, not layout, so the box is
+        // sized to the overlapped width or the gap after it would be wrong.
+        val step = 20
+        Box(Modifier.width((28 + step * (shown.size - 1)).dp).height(28.dp)) {
+            shown.forEachIndexed { i, h ->
+                val (bg, fg) = tints[i % tints.size]
+                Box(
+                    Modifier
+                        .offset(x = (step * i).dp)
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(50, 50, 50, 15))
+                        .background(bg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        h.trim().take(1).uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fg,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(Space.md))
+        val count = handles.size.coerceAtLeast(1)
+        Text(
+            when (count) {
+                1 -> "Just you so far"
+                2 -> "You and one other mother"
+                else -> "$count mothers"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkMuted,
+        )
+    }
+}
+
+/** The invite gets its own tint — it is the only chip that isn't a filter. */
+@Composable
+private fun InviteChip(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(PregaTheme.colors.terracottaSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.md, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "+ Invite",
+            style = MaterialTheme.typography.labelMedium,
+            color = PregaTheme.colors.terracotta,
+        )
+    }
+}
+
 // ─── Chat ──────────────────────────────────────────────────────────────────
+
+/** A row in the chat list: a message, or the day it belongs to. */
+private sealed interface ChatRow {
+    data class Msg(val m: ClubMessage) : ChatRow
+    data class Day(val label: String, val key: String) : ChatRow
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChatSection(profile: CommunityProfile) {
+private fun ChatSection(
+    profile: CommunityProfile,
+    memberCount: Int,
+    onInvite: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     // The flows MUST be remembered. collectAsState keys its collection on
     // the flow INSTANCE, and messages()/myBlockedIds() build a fresh
@@ -239,11 +343,33 @@ private fun ChatSection(profile: CommunityProfile) {
     val messages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val blocked by blockedFlow.collectAsStateWithLifecycle(initialValue = emptySet())
     val visible = remember(messages, blocked) { messages.filter { it.authorId !in blocked } }
+    // Newest-first list + reverseLayout: a day label must sit AFTER the
+    // oldest message of its day in list order so it renders ABOVE it.
+    val rows = remember(visible) {
+        val out = ArrayList<ChatRow>(visible.size + 8)
+        visible.forEachIndexed { i, m ->
+            out += ChatRow.Msg(m)
+            val day = dayKey(m.createdAt)
+            val next = visible.getOrNull(i + 1)
+            if (next == null || dayKey(next.createdAt) != day) {
+                out += ChatRow.Day(label = dayLabel(m.createdAt), key = "day-$day")
+            }
+        }
+        out
+    }
     var input by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize()) {
         if (visible.isEmpty()) {
-            EmptyState("It's quiet in here — say the first hello 🌸")
+            if (memberCount < 3) {
+                NewClubEmpty(
+                    month = prettyMonth(profile.dueMonth),
+                    onInvite = onInvite,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Box(Modifier.weight(1f)) { EmptyState("It's quiet in here — say the first hello 🌸") }
+            }
         } else {
             LazyColumn(
                 Modifier.weight(1f),
@@ -251,19 +377,26 @@ private fun ChatSection(profile: CommunityProfile) {
                 contentPadding = PaddingValues(horizontal = Space.gutter, vertical = Space.md),
                 verticalArrangement = Arrangement.spacedBy(Space.sm),
             ) {
-                items(visible, key = { it.id }) { m ->
-                    CommunityBubble(
-                        handle = m.handle,
-                        body = m.body,
-                        flagged = m.flagged,
-                        mine = m.authorId == profile.uid,
-                        onReport = {
-                            scope.launch {
-                                CommunityRepository.report(profile.dueMonth, "message", m.id, "reported from app")
-                            }
-                        },
-                        onBlock = { scope.launch { CommunityRepository.block(m.authorId) } },
-                    )
+                items(
+                    rows,
+                    key = { r -> when (r) { is ChatRow.Msg -> r.m.id; is ChatRow.Day -> r.key } },
+                ) { r ->
+                    when (r) {
+                        is ChatRow.Day -> DayDivider(r.label)
+                        is ChatRow.Msg -> CommunityBubble(
+                            handle = r.m.handle,
+                            time = prettyClock(r.m.createdAt),
+                            body = r.m.body,
+                            flagged = r.m.flagged,
+                            mine = r.m.authorId == profile.uid,
+                            onReport = {
+                                scope.launch {
+                                    CommunityRepository.report(profile.dueMonth, "message", r.m.id, "reported from app")
+                                }
+                            },
+                            onBlock = { scope.launch { CommunityRepository.block(r.m.authorId) } },
+                        )
+                    }
                 }
             }
         }
@@ -280,7 +413,12 @@ private fun ChatSection(profile: CommunityProfile) {
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message your club…") },
+                placeholder = {
+                    Text(
+                        if (visible.isEmpty()) "Say hello to ${prettyMonth(profile.dueMonth).substringBefore(' ')}…"
+                        else "Message ${prettyMonth(profile.dueMonth).substringBefore(' ')}…"
+                    )
+                },
                 maxLines = 4,
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -311,6 +449,66 @@ private fun ChatSection(profile: CommunityProfile) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The state every new member actually lands in. Cohort-only discovery
+ * means the first mother due in a month opens an empty room; this makes
+ * the emptiness the point and the invite the answer.
+ */
+@Composable
+private fun NewClubEmpty(month: String, onInvite: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("\uD83C\uDF38", fontSize = 40.sp)
+        Spacer(Modifier.height(Space.lg))
+        Text(
+            "Every club starts with one mother",
+            style = MaterialTheme.typography.titleLarge,
+            color = PregaTheme.colors.ink,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(Space.sm))
+        Text(
+            "Mothers due in $month will land here as they join. The fastest way to " +
+                "fill it is the ones you already know — a sister, a friend, someone " +
+                "from your clinic.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = PregaTheme.colors.inkMuted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(Space.xl))
+        PregaButton(
+            text = "Invite someone due in ${month.substringBefore(' ')}",
+            onClick = onInvite,
+        )
+        Spacer(Modifier.height(Space.md))
+        Text(
+            "Or write the first message below",
+            style = MaterialTheme.typography.bodySmall,
+            color = PregaTheme.colors.inkFaint,
+        )
+    }
+}
+
+@Composable
+private fun DayDivider(label: String) {
+    Box(Modifier.fillMaxWidth().padding(vertical = Space.xs), contentAlignment = Alignment.Center) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = PregaTheme.colors.inkFaint,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(PregaTheme.colors.recessed)
+                .padding(horizontal = Space.md, vertical = 3.dp),
+        )
     }
 }
 
@@ -527,34 +725,59 @@ private fun CommunityBubble(
     mine: Boolean,
     onReport: () -> Unit,
     onBlock: () -> Unit,
+    time: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
+    // Hers on the right in a rose whisper, everyone else on the left on
+    // card — the shape any messaging app has taught her thumb. Rose isn't
+    // in the Material scheme (olive is primary, sage secondary), so it is
+    // taken from the brand palette and dimmed for dark mode by hand.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val mineBg = if (dark) BloomRoseDeep.copy(alpha = 0.22f) else BloomRoseWhisper
+    val mineBorder = if (dark) BloomRoseDeep.copy(alpha = 0.45f) else BloomRoseSoft
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (mine) PregaTheme.colors.sageSoft else PregaTheme.colors.cardSurface)
-            .combinedClickable(onClick = { }, onLongClick = { menu = true })
-            .padding(Space.md),
+        Modifier.fillMaxWidth(),
+        horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
     ) {
         Text(
-            if (mine) "You" else handle,
+            if (time != null) "${if (mine) "You" else handle} \u00B7 $time" else if (mine) "You" else handle,
             style = MaterialTheme.typography.labelSmall,
             color = PregaTheme.colors.inkFaint,
+            modifier = Modifier.padding(horizontal = Space.sm, vertical = 2.dp),
         )
-        Spacer(Modifier.height(2.dp))
-        Text(body, style = MaterialTheme.typography.bodyLarge, color = PregaTheme.colors.ink)
-        if (flagged) {
-            Spacer(Modifier.height(Space.sm))
-            SafetyNotice(
-                text = "This mentions symptoms that deserve a professional — " +
-                    "if this is you, please talk to your midwife or doctor."
-            )
-        }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(text = { Text("Report") }, onClick = { menu = false; onReport() })
-            if (!mine) {
-                DropdownMenuItem(text = { Text("Block this member") }, onClick = { menu = false; onBlock() })
+        Column(
+            Modifier
+                .fillMaxWidth(0.84f)
+                .clip(
+                    if (mine) RoundedCornerShape(18.dp, 18.dp, 5.dp, 18.dp)
+                    else RoundedCornerShape(18.dp, 18.dp, 18.dp, 5.dp)
+                )
+                .background(if (mine) mineBg else PregaTheme.colors.cardSurface)
+                .then(
+                    if (mine) Modifier.border(
+                        1.dp, mineBorder,
+                        RoundedCornerShape(18.dp, 18.dp, 5.dp, 18.dp),
+                    ) else Modifier.border(
+                        1.dp, PregaTheme.colors.hairline,
+                        RoundedCornerShape(18.dp, 18.dp, 18.dp, 5.dp),
+                    )
+                )
+                .combinedClickable(onClick = { }, onLongClick = { menu = true })
+                .padding(horizontal = Space.md, vertical = 10.dp),
+        ) {
+            Text(body, style = MaterialTheme.typography.bodyLarge, color = PregaTheme.colors.ink)
+            if (flagged) {
+                Spacer(Modifier.height(Space.sm))
+                SafetyNotice(
+                    text = "This mentions symptoms that deserve a professional — " +
+                        "if this is you, please talk to your midwife or doctor."
+                )
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Report") }, onClick = { menu = false; onReport() })
+                if (!mine) {
+                    DropdownMenuItem(text = { Text("Block this member") }, onClick = { menu = false; onBlock() })
+                }
             }
         }
     }
@@ -581,3 +804,19 @@ private fun prettyMonth(yyyyMm: String): String = runCatching {
 
 private fun prettyTime(millis: Long): String =
     SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault()).format(Date(millis))
+
+private fun prettyClock(millis: Long): String =
+    if (millis == 0L) "" else SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(millis))
+
+private fun dayKey(millis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(millis))
+
+private fun dayLabel(millis: Long): String {
+    val today = dayKey(System.currentTimeMillis())
+    val yesterday = dayKey(System.currentTimeMillis() - 86_400_000L)
+    return when (dayKey(millis)) {
+        today -> "Today"
+        yesterday -> "Yesterday"
+        else -> SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(millis))
+    }
+}

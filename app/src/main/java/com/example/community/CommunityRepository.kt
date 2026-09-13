@@ -154,6 +154,13 @@ object CommunityRepository {
         )
     }
 
+    /** Member handles in join order — for the avatar row and the honest count. */
+    fun members(club: String): Flow<List<String>> = watch(
+        db.collection("clubs").document(club).collection("members")
+            .orderBy("joinedAt")
+            .limit(80)
+    ) { d -> d.getString("handle").orEmpty() }
+
     fun myBlockedIds(): Flow<Set<String>> {
         val id = uid ?: return flowOf(emptySet())
         return watch(db.collection("profiles").document(id).collection("blocks")) { it.id }
