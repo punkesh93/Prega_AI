@@ -37,7 +37,13 @@ import java.util.concurrent.TimeUnit
 @JsonClass(generateAdapter = true)
 data class AiMessage(
     val role: String,   // "system" | "user" | "assistant"
-    val content: String,
+    val content: String?,
+    /**
+     * Some providers return the model's chain of thought here instead of
+     * (or as well as) in content. It is never shown: it exists in this
+     * class only so it can't be mistaken for the answer.
+     */
+    val reasoning: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -46,7 +52,17 @@ data class ChatRequest(
     val messages: List<AiMessage>,
     val temperature: Double = 0.8,
     @Json(name = "max_tokens") val maxTokens: Int = 1200,
+    /**
+     * Reasoning models (the coach runs Nemotron 3 Ultra) think before they
+     * answer. OpenRouter's unified switch asks the provider to keep that
+     * thinking out of the response entirely. Belt and braces: some
+     * providers ignore it, so the reply is also cleaned on arrival.
+     */
+    val reasoning: ReasoningOptions? = ReasoningOptions(),
 )
+
+@JsonClass(generateAdapter = true)
+data class ReasoningOptions(val exclude: Boolean = true)
 
 @JsonClass(generateAdapter = true)
 data class ChatChoice(val message: AiMessage?)
@@ -210,11 +226,19 @@ object OpenRouterClient {
             temperature = temperature,
             maxTokens = maxTokens,
         )
-    ).choices?.firstOrNull()?.message?.content?.trim()
+    ).choices?.firstOrNull()?.message?.content?.withoutReasoning()?.trim()
 
     private fun classify(text: String?): AiResult = when {
         text.isNullOrBlank() ->
             AiResult.Failure("The model returned an empty response.", retryable = true)
+        text.isLeakedReasoning() ->
+            // The model narrated its own planning instead of answering
+            // ("The user is asking… I need to… I should ask"). Seen in the
+            // wild on the coach after the Nemotron upgrade: a reasoning
+            // model whose thinking arrived inside content. Never show a
+            // mother the machine thinking about her; treat it exactly like
+            // an empty reply so fallbacks and the retry path take over.
+            AiResult.Failure("The model returned its notes instead of an answer.", retryable = true)
         text.isDegenerate() ->
             // Model got stuck in a repetition loop ("practices iter
             // practices iter..." — seen in the wild on the daily insight
@@ -257,6 +281,70 @@ object OpenRouterClient {
 
     /** Keeps token spend bounded on long coach conversations. */
     private const val MAX_HISTORY_TURNS = 12
+}
+
+/**
+ * Removes an explicit chain-of-thought block from a reply.
+ *
+ * Reasoning models emit their thinking either in a separate field (handled
+ * by [AiMessage.reasoning]) or inline, fenced by a tag. When the tag is
+ * present the split is unambiguous: everything up to and including the
+ * closing tag is thinking, everything after is the answer. An UNCLOSED
+ * opening tag means the whole reply is thinking and the answer never
+ * arrived — that returns empty, which [classify] already treats as a
+ * failure worth retrying.
+ */
+fun String.withoutReasoning(): String {
+    var s = this
+    for (tag in listOf("think", "thinking", "reasoning", "analysis", "scratchpad")) {
+        val open = Regex("""(?is)<$tag>""")
+        val closed = Regex("""(?is)<$tag>.*?</$tag>""")
+        s = s.replace(closed, "")
+        // Opened and never closed: nothing after it is an answer.
+        if (open.containsMatchIn(s)) s = s.substringBefore(open.find(s)!!.value)
+    }
+    return s.trim()
+}
+
+/**
+ * Detects a reply that is the model's planning rather than its answer.
+ *
+ * The production case, reported on the coach: a mother asked what to expect
+ * at her 26-week scan and got back "The user is asking about… I need to
+ * provide… I should ask what type of scan they're scheduled for, or" —
+ * untagged reasoning, cut off mid-sentence.
+ *
+ * Tuned to be hard to trip by accident, because a false positive throws
+ * away a good answer. Two independent signals, and the text must LEAD with
+ * the tell — a reply that opens warmly and later says "I need to be honest
+ * with you" is fine:
+ *
+ * 1. Third-person reference to the person being helped ("the user", "the
+ *    patient asking"). The coach speaks TO her as "you"; it has no reason
+ *    to mention a user at all.
+ * 2. Two or more first-person planning phrases ("I need to provide", "I
+ *    should ask", "let me think", "my response should") in the opening
+ *    stretch of the reply.
+ */
+fun String.isLeakedReasoning(): Boolean {
+    val head = take(400)
+    val lower = head.lowercase()
+    if (lower.isBlank()) return false
+
+    val thirdPerson = Regex(
+        """\b(the|this)\s+(user|person)\s+(is|has|wants|asked|is asking|seems|needs)\b"""
+    )
+    if (thirdPerson.containsMatchIn(lower)) return true
+
+    val planning = listOf(
+        "i need to provide", "i need to give", "i should provide", "i should ask",
+        "i should mention", "i should explain", "i should note", "i'll need to",
+        "let me think", "my response should", "my answer should", "i need to be careful",
+        "the question is asking", "they're asking about", "they are asking about",
+        "i should probably", "first, i", "okay, so",
+    )
+    val hits = planning.count { it in lower }
+    return hits >= 2
 }
 
 /**
