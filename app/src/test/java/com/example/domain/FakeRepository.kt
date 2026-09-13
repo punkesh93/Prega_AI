@@ -62,6 +62,27 @@ class FakeDao : PregnancyDao {
     override fun getWeights(): Flow<List<WeightEntity>> = flowOf(emptyList())
     override suspend fun insertWeight(weight: WeightEntity) = Unit
     override suspend fun deleteAllWeights() = Unit
+
+    // Added with the journal, the 2 AM contraction contract and the doctor
+    // question bank. The DAO grew; this fake didn't, and the whole test
+    // source set stopped compiling — which CI was the first to notice.
+    override suspend fun insertJournalEntry(entry: JournalEntity): Long = 0L
+    override fun getJournalEntries(): Flow<List<JournalEntity>> = flowOf(emptyList())
+    override suspend fun journalCountForDate(date: String): Int = 0
+    override suspend fun deleteJournalEntry(id: Long) = Unit
+    override suspend fun clearJournal() = Unit
+    override fun getAllActiveDates(): Flow<List<String>> = flowOf(emptyList())
+    override fun activeContractionSession(): Flow<ContractionSessionEntity?> = flowOf(null)
+    override suspend fun insertContractionSession(session: ContractionSessionEntity) = Unit
+    override suspend fun endContractionSession(sessionId: Long, endedAt: Long) = Unit
+    override fun contractionsForSession(sessionId: Long): Flow<List<ContractionEntity>> = flowOf(emptyList())
+    override fun activeContraction(): Flow<ContractionEntity?> = flowOf(null)
+    override suspend fun finishActiveContraction(duration: Int) = Unit
+    override suspend fun setContractionDuration(id: Int, duration: Int) = Unit
+    override suspend fun deleteContraction(id: Int) = Unit
+    override fun doctorQuestions(): Flow<List<DoctorQuestionEntity>> = flowOf(emptyList())
+    override suspend fun upsertDoctorQuestion(question: DoctorQuestionEntity) = Unit
+    override suspend fun deleteDoctorQuestion(id: Int) = Unit
 }
 
 /** Convenience factory used by the engine tests. */
