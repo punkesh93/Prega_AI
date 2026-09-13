@@ -74,7 +74,7 @@ private val Koi = Color(0xFFE2784A)
 private val Lily = Color(0xFF789660)
 private val Iris = Color(0xFF7C60A8)
 private val IrisSoft = Color(0xFFC5BADE)
-private val MapleReds = listOf(Color(0xFFC4584A), Color(0xFFD8785A), Color(0xFFE59A62), Color(0xFFB85A67))
+internal val gardenMapleReds = listOf(Color(0xFFC4584A), Color(0xFFD8785A), Color(0xFFE59A62), Color(0xFFB85A67))
 private val MapleGreens = listOf(Color(0xFF7EA562), Color(0xFF6C9455), Color(0xFF9AB86A))
 private val AzaleaPinks = listOf(Color(0xFFD97A84), Color(0xFFE996A0), Color(0xFFF0B4BE))
 private val MountainFar = Color(0xFFC4D0B6)
@@ -305,6 +305,59 @@ internal fun DrawScope.drawIris(px: Float, py: Float, sx: Float, sy: Float, fog:
     }
 }
 
+// ─── Flat-garden (diorama) versions ────────────────────────────────────────
+
+/** Two ranges of mist mountains along the top of the flat garden's mounds. */
+internal fun DrawScope.drawGardenMountains(t: Float) {
+    val w = size.width
+    val h = size.height
+    val base = h * 0.62f
+    for ((idx, layer) in listOf(MountainFar to 0.20f, MountainMid to 0.13f).withIndex()) {
+        val (col, amp) = layer
+        val path = Path()
+        path.moveTo(-4f, base + 4f)
+        val steps = 22
+        for (i in 0..steps) {
+            val x = -4f + (w + 8f) * i / steps
+            val u = x / w * 6.3f
+            val ridge = 0.5f + 0.5f * sin(u * 1.1f + idx * 1.7f) + 0.25f * sin(u * 2.7f + idx) + 0.1f * sin(u * 6f)
+            path.lineTo(x, base + h * 0.02f * idx - h * amp * ridge)
+        }
+        path.lineTo(w + 4f, base + 4f)
+        path.close()
+        drawPath(path, col.copy(alpha = 0.55f + idx * 0.2f))
+    }
+    // A breath of mist lying on the far mound.
+    drawRect(
+        brush = Brush.verticalGradient(
+            0f to Mist.copy(alpha = 0f), 0.5f to Mist.copy(alpha = 0.7f), 1f to Mist.copy(alpha = 0f),
+            startY = base - h * 0.03f, endY = base + h * 0.05f,
+        ),
+        topLeft = Offset(0f, base - h * 0.03f),
+        size = Size(w, h * 0.08f),
+    )
+}
+
+/** An oval pond in screen space with reflection rings, lily pads and a koi. */
+internal fun DrawScope.drawGardenPond(cx: Float, cy: Float, rx: Float, ry: Float, t: Float) {
+    for (ring in 0..3) {
+        val f = ring / 3.5f
+        drawOval(
+            mixToward(Water, WaterLight, f),
+            Offset(cx - rx * (1f - f * 0.35f), cy - ry * (1f - f * 0.35f)),
+            Size(2f * rx * (1f - f * 0.35f), 2f * ry * (1f - f * 0.35f)),
+        )
+    }
+    for ((px, py, pr) in listOf(Triple(-0.55f, -0.3f, 0.16f), Triple(0.35f, 0.35f, 0.14f), Triple(0.6f, -0.45f, 0.12f))) {
+        val r = rx * pr
+        drawOval(Lily, Offset(cx + rx * px - r, cy + ry * py - r * 0.35f), Size(2f * r, r * 0.7f))
+    }
+    val kx = cx + rx * (0.05f + sin(t * 0.5f) * 0.25f)
+    val ky = cy + ry * 0.05f
+    drawOval(Koi, Offset(kx - rx * 0.12f, ky - ry * 0.16f), Size(rx * 0.24f, ry * 0.32f))
+    drawOval(Color(0xFFF6F0E8), Offset(kx - rx * 0.04f, ky - ry * 0.12f), Size(rx * 0.08f, ry * 0.16f))
+}
+
 // ─── The frame ─────────────────────────────────────────────────────────────
 
 internal fun DrawScope.drawJapaneseWalk(
@@ -501,7 +554,7 @@ internal fun DrawScope.drawJapaneseWalk(
                 val s = cam.focalX / p.depth
                 val sy = cam.focalY / p.depth
                 val f = cam.fog(p.depth)
-                val cols = if (i == 2 || i == 5) MapleGreens else MapleReds
+                val cols = if (i == 2 || i == 5) MapleGreens else gardenMapleReds
                 items += Drawable(p.depth) { drawMaple(p.sx, p.sy, s, sy, f, scale, cols, k * 17 + i, clock) }
             }
 

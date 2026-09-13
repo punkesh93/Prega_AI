@@ -465,23 +465,55 @@ internal fun DrawScope.drawGardenScene(
             1f to GardenSageLight.copy(alpha = 0.35f),
         ),
     )
+    // The same stroll garden the walk goes into, as a diorama: two ranges
+    // of mist mountains, then the mounds, then the things she recognises
+    // from the walk — a maple, a lantern, a pond, rocks, bamboo, azaleas.
+    // Scene scale: px per world metre, from height so it holds on any width.
+    val m = size.height * 0.11f
+    drawGardenMountains(t)
     // Far mound: a third depth plane behind the two existing ones.
     drawOval(
         color = GardenSageLight.copy(alpha = 0.55f),
         topLeft = Offset(size.width * 0.28f, size.height * 0.55f),
         size = androidx.compose.ui.geometry.Size(size.width * 0.9f, size.height * 0.5f),
     )
+    // A maple on the far mound, back-left, behind everything that grows.
+    drawMaple(size.width * 0.16f, size.height * 0.72f, m * 0.55f, m * 0.55f, 0.35f, 1.3f, gardenMapleReds, 11, t)
     // Ground: two overlapping sage mounds.
     drawOval(
         color = GardenSageLight,
         topLeft = Offset(-size.width * 0.2f, size.height * 0.62f),
         size = androidx.compose.ui.geometry.Size(size.width * 1.4f, size.height * 0.8f),
     )
+    // Bamboo at the right edge, half out of frame like a real garden.
+    for (i in 0 until 4) {
+        drawBambooStalk(size.width * (0.90f + i * 0.035f), size.height * 0.84f, m * 0.62f, m * 0.62f, 0.15f, 0.04f + i * 0.02f)
+    }
+    // Lantern on the mid mound, right of centre.
+    drawLantern(size.width * 0.78f, size.height * 0.80f, m * 0.7f, m * 0.7f, 0.12f)
+    // Mossed rocks either side.
+    drawMossRock(size.width * 0.62f, size.height * 0.83f, m * 0.6f, m * 0.6f, 0.1f, 0.7f, 0.45f)
+    drawMossRock(size.width * 0.05f, size.height * 0.88f, m * 0.7f, m * 0.7f, 0.05f, 0.9f, 0.5f)
     drawOval(
         color = GardenSageDeep,
         topLeft = Offset(-size.width * 0.3f, size.height * 0.78f),
         size = androidx.compose.ui.geometry.Size(size.width * 1.6f, size.height * 0.9f),
     )
+    // Pond, front-left, with lily pads and one koi that drifts.
+    drawGardenPond(size.width * 0.22f, size.height * 0.955f, size.width * 0.20f, size.height * 0.055f, t)
+    // Stepping stones curving from the pond toward the lantern.
+    for (i in 0 until 5) {
+        val f = i / 4f
+        val sx = size.width * (0.42f + f * 0.32f)
+        val sy = size.height * (0.97f - f * 0.09f + sin(f * 3f) * 0.01f)
+        val r = m * (0.34f - f * 0.05f)
+        drawOval(Color(0xFFBBBDB0), Offset(sx - r, sy - r * 0.3f), androidx.compose.ui.geometry.Size(2f * r, r * 0.6f))
+        drawOval(Color(0xFFCDC9B8), Offset(sx - r * 0.8f, sy - r * 0.25f), androidx.compose.ui.geometry.Size(1.6f * r, r * 0.38f))
+    }
+    // Azalea mounds among the blooms — always in flower; they are the
+    // garden's own, not hers to earn.
+    drawAzalea(size.width * 0.88f, size.height * 0.93f, m * 0.62f, m * 0.62f, 0.05f, 3, true)
+    drawAzalea(size.width * 0.50f, size.height * 0.86f, m * 0.5f, m * 0.5f, 0.1f, 5, true)
 
     // Flowers that have bloomed, plus the next one as a bud.
     blooms.forEachIndexed { i, b ->
