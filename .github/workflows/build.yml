@@ -55,7 +55,7 @@ jobs:
         id: hash
         run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -70,11 +70,38 @@ jobs:
           echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" > .env
           echo "GEMINI_API_KEY=unused" >> .env
 
+      # Gradle output is tee'd to a file so the FAILURE step below can turn
+      # the real error lines (Kotlin's "e: file:line:col message", Gradle's
+      # "What went wrong") into check-run annotations. Annotations are
+      # readable through the API; the raw log is not (it lives on blob
+      # storage), and a red X with no reason is almost useless.
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee gradle-test.log; exit ${PIPESTATUS[0]}
 
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log; exit ${PIPESTATUS[0]}
+
+      - name: Surface the errors
+        if: failure()
+        run: |
+          for f in gradle-test.log gradle-build.log; do
+            [ -f "$f" ] || continue
+            # Kotlin compiler errors: e: file:///…/Foo.kt:12:5 message
+            grep -E '^e: ' "$f" | head -20 | while IFS= read -r line; do
+              path=$(echo "$line" | sed -E 's#^e: (file://)?([^:]+):([0-9]+):([0-9]+) (.*)#\2#' | sed "s#$GITHUB_WORKSPACE/##")
+              ln=$(echo "$line" | sed -E 's#^e: (file://)?([^:]+):([0-9]+):([0-9]+) (.*)#\3#')
+              msg=$(echo "$line" | sed -E 's#^e: (file://)?([^:]+):([0-9]+):([0-9]+) (.*)#\5#')
+              echo "::error file=$path,line=$ln::$msg"
+            done
+            # Gradle's own diagnosis block
+            awk '/What went wrong/{f=1} f&&/^\* Try:/{f=0} f' "$f" | head -12 | while IFS= read -r line; do
+              echo "::error::GRADLE: $line"
+            done
+            # Failed tests
+            grep -E 'FAILED$' "$f" | head -10 | while IFS= read -r line; do
+              echo "::error::TEST: $line"
+            done
+          done
 
       # The FILENAME must stay exactly prega-ai.apk: both the website
       # Download button and UpdateChecker fetch
