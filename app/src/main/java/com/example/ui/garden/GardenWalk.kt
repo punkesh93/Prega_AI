@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.NoPhotography
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.ScreenLockRotation
 import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material3.Icon
@@ -102,6 +104,7 @@ private const val STEPS_PER_METRE = STEP_HZ / WALK_SPEED
 private const val PREFS = "prega_garden"
 private const val KEY_SOUND = "sound_on"
 private const val KEY_MOTION = "walk_motion_look"
+private const val KEY_ROOM = "walk_in_room"
 
 @Composable
 fun GardenWalk(
@@ -153,6 +156,54 @@ fun GardenWalk(
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val soundOn = remember { prefs.getBoolean(KEY_SOUND, true) }
     var motionLook by remember { mutableStateOf(prefs.getBoolean(KEY_MOTION, true)) }
+
+    // ── "In my room": the live camera behind the drawn garden. Opt-in,
+    // remembered, and the permission is asked only when she taps it — a
+    // pregnancy app that promises nothing leaves the phone must never ask
+    // for the camera unprompted. Preview use case only: no capture, no
+    // analysis, no frame ever stored or sent. Without a camera, or with the
+    // permission refused, the toggle simply does nothing visible.
+    var inRoom by remember { mutableStateOf(prefs.getBoolean(KEY_ROOM, false)) }
+    var cameraGranted by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        cameraGranted = granted
+        inRoom = granted
+        prefs.edit { putBoolean(KEY_ROOM, granted) }
+    }
+    val roomLive = inRoom && cameraGranted
+    val previewView = remember {
+        androidx.camera.view.PreviewView(context).apply {
+            scaleType = androidx.camera.view.PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+    val roomLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(roomLive) {
+        if (!roomLive) return@DisposableEffect onDispose { }
+        val future = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
+        var provider: androidx.camera.lifecycle.ProcessCameraProvider? = null
+        future.addListener({
+            runCatching {
+                provider = future.get()
+                val preview = androidx.camera.core.Preview.Builder().build()
+                preview.setSurfaceProvider(previewView.surfaceProvider)
+                provider?.unbindAll()
+                provider?.bindToLifecycle(
+                    roomLifecycleOwner,
+                    androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                )
+            }
+        }, androidx.core.content.ContextCompat.getMainExecutor(context))
+        onDispose { runCatching { provider?.unbindAll() } }
+    }
 
     // ── Look around by moving the phone: gyroscope y → heading, x → pitch.
     // Held upright in portrait the phone's y axis is world-up, so turning
@@ -326,7 +377,7 @@ fun GardenWalk(
         Modifier
             .fillMaxSize()
             .zIndex(30f)
-            .background(Color(0xFFFDFBF4))
+            .background(if (roomLive) Color.Transparent else Color(0xFFFDFBF4))
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     var lastX = 0f
@@ -360,6 +411,12 @@ fun GardenWalk(
                 }
             },
     ) {
+        if (roomLive) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { previewView },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Canvas(Modifier.fillMaxSize()) {
             viewW = size.width
             viewH = size.height
@@ -377,10 +434,43 @@ fun GardenWalk(
                 goldRatio = goldRatio,
                 butterflies = butterflies,
                 visitors = visitors,
+                passthrough = roomLive,
             )
         }
 
-        // Motion-look toggle — the only other chrome. Off is remembered.
+        // "In my room" toggle. Asks for the camera only on this tap.
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = Space.gutter, end = Space.gutter + 50.dp)
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color(0xCCFAF8F1))
+                .clickable {
+                    when {
+                        inRoom -> {
+                            inRoom = false
+                            prefs.edit { putBoolean(KEY_ROOM, false) }
+                        }
+                        cameraGranted -> {
+                            inRoom = true
+                            prefs.edit { putBoolean(KEY_ROOM, true) }
+                        }
+                        else -> cameraPermission.launch(android.Manifest.permission.CAMERA)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (roomLive) Icons.Rounded.NoPhotography else Icons.Rounded.PhotoCamera,
+                contentDescription = if (roomLive) "Back to the garden's own sky"
+                else "Put the garden in my room (uses the camera)",
+                tint = Color(0xFF3A342A),
+            )
+        }
+
+        // Motion-look toggle. Off is remembered.
         Box(
             Modifier
                 .align(Alignment.TopEnd)
@@ -435,7 +525,7 @@ fun GardenWalk(
             ) {
                 Text(
                     if (motionLook) "Drag up to stroll \u00B7 sideways to turn \u00B7 move your phone to look"
-                    else "Drag up to stroll \u00B7 sideways to turn",
+                    else "Drag up to stroll \u00B7 sideways to turn \u00B7 \uD83D\uDCF7 for your room",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFF5A503C),
                 )

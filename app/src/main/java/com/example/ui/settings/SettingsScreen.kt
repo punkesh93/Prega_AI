@@ -295,6 +295,8 @@ fun SettingsScreen(
 
                         Sharing: nothing is ever shared unless you tap share yourself.
 
+                        Camera: only if you tap "in my room" on the garden walk. The camera shows a live view behind the drawn garden on your screen and nothing more — no photo is taken, nothing is analysed, nothing is stored or sent. Tap again to switch it off; you can also refuse the permission and the walk works exactly as before.
+
                         Payments: subscriptions are handled entirely by Google Play. We never see your payment details.
 
                         Deleting: "Delete everything" below removes all of it, immediately and permanently. Uninstalling the app does the same.

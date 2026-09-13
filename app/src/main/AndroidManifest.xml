@@ -11,6 +11,12 @@
 
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
 
+    <!-- Optional, asked only when she taps "in my room" on the garden walk.
+         The camera feeds a live preview behind the drawn garden and nothing
+         else: no photos, no analysis, no upload. Not required hardware. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
     <application
         android:name=".PregaApplication"
         android:allowBackup="true"

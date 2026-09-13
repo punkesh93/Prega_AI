@@ -368,12 +368,61 @@ internal fun DrawScope.drawJapaneseWalk(
     goldRatio: Float,
     butterflies: Int,
     visitors: List<Visitor>,
+    /**
+     * "In my room": the live camera is showing behind this canvas, so the
+     * sky, mountains and mist stay undrawn and the ground is a translucent
+     * sage wash — the garden's things stand in her actual room. The sun,
+     * light shafts and vignette are off too: the room has its own light.
+     */
+    passthrough: Boolean = false,
 ) {
     val w = cam.w
     val h = cam.h
     val horizon = cam.horizon
 
     rotate(degrees = roll, pivot = Offset(w / 2f, h * 0.6f)) {
+        if (!passthrough) drawSkyAndMountains(cam)
+        // ── Ground ──
+        if (passthrough) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to GardenSageLight.copy(alpha = 0f), 0.35f to GardenSageLight.copy(alpha = 0.32f),
+                    1f to GardenSageDeep.copy(alpha = 0.55f),
+                    startY = horizon, endY = h,
+                ),
+                topLeft = Offset(0f, horizon),
+                size = Size(w, h - horizon + h),
+            )
+        } else {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Mist, 0.4f to GardenSageLight, 1f to GardenSageDeep,
+                    startY = horizon, endY = h + h * 0.4f,
+                ),
+                topLeft = Offset(0f, horizon),
+                size = Size(w, h - horizon + h),
+            )
+            // Mist band lying on the horizon.
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Mist.copy(alpha = 0f), 0.5f to Mist.copy(alpha = 0.85f), 1f to Mist.copy(alpha = 0f),
+                    startY = horizon - h * 0.03f, endY = horizon + h * 0.05f,
+                ),
+                topLeft = Offset(0f, horizon - h * 0.03f),
+                size = Size(w, h * 0.08f),
+            )
+        }
+        drawWorldObjects(cam, clock, density, goldRatio, butterflies, visitors)
+        if (!passthrough) drawScreenLight(cam, clock)
+    }
+}
+
+/** Sky, sun and three ranges of mist mountains at fixed bearings. */
+private fun DrawScope.drawSkyAndMountains(cam: WalkCamera) {
+    val w = cam.w
+    val h = cam.h
+    val horizon = cam.horizon
+    run {
         // ── Sky, hung from the horizon so pitch moves it ──
         drawRect(
             brush = Brush.verticalGradient(
@@ -386,11 +435,9 @@ internal fun DrawScope.drawJapaneseWalk(
         // The sun keeps a fixed bearing in the world; turning carries it
         // across the sky — the strongest cue that turning is real.
         val sunRel = relBearing(0.4f, cam.heading)
-        var sunX = -1f
-        var sunY = -1f
         if (abs(sunRel) < 1.2f) {
-            sunX = w / 2f + tan(sunRel) * cam.focalX
-            sunY = horizon - h * 0.25f
+            val sunX = w / 2f + tan(sunRel) * cam.focalX
+            val sunY = horizon - h * 0.25f
             drawCircle(Color(0x22E3B23C), w * 0.26f, Offset(sunX, sunY))
             drawCircle(Color(0x33E3B23C), w * 0.17f, Offset(sunX, sunY))
             drawCircle(Color(0x55E9C87A), w * 0.09f, Offset(sunX, sunY))
@@ -418,25 +465,21 @@ internal fun DrawScope.drawJapaneseWalk(
             drawPath(path, col.copy(alpha = alpha))
         }
 
-        // ── Ground ──
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to Mist, 0.4f to GardenSageLight, 1f to GardenSageDeep,
-                startY = horizon, endY = h + h * 0.4f,
-            ),
-            topLeft = Offset(0f, horizon),
-            size = Size(w, h - horizon + h),
-        )
-        // Mist band lying on the horizon.
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to Mist.copy(alpha = 0f), 0.5f to Mist.copy(alpha = 0.85f), 1f to Mist.copy(alpha = 0f),
-                startY = horizon - h * 0.03f, endY = horizon + h * 0.05f,
-            ),
-            topLeft = Offset(0f, horizon - h * 0.03f),
-            size = Size(w, h * 0.08f),
-        )
+    }
+}
 
+/** Everything that stands in the world, gathered, culled, depth-sorted, drawn. */
+private fun DrawScope.drawWorldObjects(
+    cam: WalkCamera,
+    clock: Float,
+    density: Float,
+    goldRatio: Float,
+    butterflies: Int,
+    visitors: List<Visitor>,
+) {
+    val w = cam.w
+    val h = cam.h
+    run {
         // ── Gather the world ──
         val items = ArrayList<Drawable>(512)
         val camX = cam.x
@@ -713,6 +756,22 @@ internal fun DrawScope.drawJapaneseWalk(
         items.sortByDescending { it.depth }
         for (d in items) d.draw(this)
 
+    }
+}
+
+/** Light shafts, drifting petals and the vignette — screen-space, on top. */
+private fun DrawScope.drawScreenLight(cam: WalkCamera, clock: Float) {
+    val w = cam.w
+    val h = cam.h
+    val horizon = cam.horizon
+    val sunRel = relBearing(0.4f, cam.heading)
+    var sunX = -1f
+    var sunY = -1f
+    if (abs(sunRel) < 1.2f) {
+        sunX = w / 2f + tan(sunRel) * cam.focalX
+        sunY = horizon - h * 0.25f
+    }
+    run {
         // ── Light shafts from the sun, screen-space, barely there ──
         if (sunX > -1f) {
             for (i in 0 until 4) {
