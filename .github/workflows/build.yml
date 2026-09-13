@@ -1,0 +1,125 @@
+# Prega AI — compile on every push, publish only when asked.
+#
+# Two jobs in one file, on purpose:
+#
+#  - "build" runs on every push to redesign/v2 and every manual run. Its
+#    only job is to be a compiler in the loop: a red ✗ within minutes of a
+#    commit is the difference between finding a broken lambda here and
+#    finding it after a 20-minute Colab build. The APK is attached to the
+#    run as an artifact either way, so any green commit is installable.
+#
+#  - "publish" runs ONLY on a manual run with publish=true. Releases are
+#    what trigger the in-app update card on every installed phone, so they
+#    stay a deliberate human act — no push should ever OTA-prompt her.
+#
+# The unit tests (ContractionMathTest — the 2 AM contract) run before the
+# APK is assembled: if the contraction maths is wrong, nothing ships.
+
+name: Build
+
+on:
+  push:
+    branches: [redesign/v2]
+  pull_request:
+    branches: [redesign/v2]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub Release (turns on the in-app update card)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  # A newer push makes an in-flight build irrelevant — except for publishes,
+  # which must never be cancelled halfway through creating a release.
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      hash: ${{ steps.hash.outputs.short }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # BuildConfig.GIT_HASH comes from `git rev-parse` at build time, so
+          # the checkout must be a real repo, not a tarball. fetch-depth 1 is
+          # enough for HEAD's own hash.
+          fetch-depth: 1
+
+      - name: Short hash
+        id: hash
+        run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The Secrets Gradle plugin reads .env, which is gitignored and must
+      # stay that way. Recreate it from the repo secret; the key never
+      # appears in the log because Actions masks registered secrets.
+      - name: Write .env
+        run: |
+          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" > .env
+          echo "GEMINI_API_KEY=unused" >> .env
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Assemble debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      # The FILENAME must stay exactly prega-ai.apk: both the website
+      # Download button and UpdateChecker fetch
+      # releases/latest/download/prega-ai.apk, which resolves by asset
+      # name. A per-commit filename would break the download link and the
+      # in-app update card at once. The commit lives in the tag instead.
+      - name: Stage the APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/prega-ai.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prega-ai-${{ steps.hash.outputs.short }}
+          path: out/*.apk
+          retention-days: 30
+
+      # Test reports are worth more than the APK when the build is red.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports-${{ steps.hash.outputs.short }}
+          path: app/build/reports/
+          retention-days: 14
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: prega-ai-${{ needs.build.outputs.hash }}
+          path: out
+
+      # The tag shape build-<short hash> is a contract with the app:
+      # UpdateChecker compares BuildConfig.GIT_HASH against the latest
+      # release tag. Changing this format silently breaks OTA updates.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${{ needs.build.outputs.hash }}"
+          gh release create "$tag" out/*.apk \
+            --repo "${{ github.repository }}" \
+            --title "$tag" \
+            --notes "Automated build of ${{ needs.build.outputs.hash }}." \
+            || gh release upload "$tag" out/*.apk --repo "${{ github.repository }}" --clobber
