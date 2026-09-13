@@ -65,10 +65,18 @@ jobs:
       # The Secrets Gradle plugin reads .env, which is gitignored and must
       # stay that way. Recreate it from the repo secret; the key never
       # appears in the log because Actions masks registered secrets.
+      # The secrets plugin quotes non-empty values but passes an EMPTY one
+      # through unquoted — `OPENROUTER_API_KEY = ;` — which is a Java
+      # syntax error. So a missing repo secret must become a placeholder,
+      # not an empty string: the build still proves the code compiles,
+      # and the AI features simply get 401s until the real key is added.
       - name: Write .env
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" > .env
+          echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-secret-not-set}" > .env
           echo "GEMINI_API_KEY=unused" >> .env
+          [ -n "$OPENROUTER_API_KEY" ] || echo "::warning::OPENROUTER_API_KEY secret is not set; APK will have no working AI key"
 
       # Gradle output is tee'd to a file so the FAILURE step below can turn
       # the real error lines (Kotlin's "e: file:line:col message", Gradle's
